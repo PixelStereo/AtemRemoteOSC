@@ -1,6 +1,6 @@
 #include "AtemBackendFactory.h"
 
-#if defined(__APPLE__) || defined(_WIN32)
+#if defined(ATEM_HAVE_BMD_SDK)
 #include "bmd/BmdSwitcherBackend.h"
 #endif
 
@@ -13,7 +13,7 @@ IAtemBackend* BackendFactory::createBackend(BackendType type, QObject *parent) {
         return new AtemNet::NetworkAtemBackend(parent);
     }
 
-#if defined(__APPLE__) || defined(_WIN32)
+#if defined(ATEM_HAVE_BMD_SDK)
     if (type == BackendType::OfficialSdk || type == BackendType::Auto) {
         return new BmdSwitcherBackend(parent);
     }

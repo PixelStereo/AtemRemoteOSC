@@ -88,6 +88,11 @@ endif()
 
 add_executable(AtemRemoteOsc ${SOURCES})
 
+# Seen by moc too (unlike the compiler's own platform macros): the SDK backend only exists on macOS and Windows
+if(APPLE OR WIN32)
+    target_compile_definitions(AtemRemoteOsc PRIVATE ATEM_HAVE_BMD_SDK=1)
+endif()
+
 target_link_libraries(AtemRemoteOsc PRIVATE
     Qt6::Core
     Qt6::Gui

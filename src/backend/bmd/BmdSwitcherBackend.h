@@ -6,7 +6,7 @@
 #include <QHash>
 #include <QTimer>
 
-#if defined(__APPLE__) || defined(_WIN32)
+#if defined(ATEM_HAVE_BMD_SDK)
 
 class SwitcherMonitor;
 class MixEffectBlockMonitor;

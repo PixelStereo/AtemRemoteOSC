@@ -3,7 +3,7 @@
 #include <QMetaObject>
 #include <QDebug>
 
-#if defined(__APPLE__) || defined(_WIN32)
+#if defined(ATEM_HAVE_BMD_SDK)
 
 static QString cfOrBstrToQString(
 #if defined(__APPLE__)

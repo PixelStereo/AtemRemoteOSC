@@ -2,7 +2,7 @@
 #include "BmdSwitcherBackend.h"
 #include <cstring>
 
-#if defined(__APPLE__) || defined(_WIN32)
+#if defined(ATEM_HAVE_BMD_SDK)
 
 #if defined(_WIN32)
 static REFIID unknownIid() { return IID_IUnknown; }
