@@ -28,3 +28,8 @@ DerivedData
 
 # Vim
 *.swp
+
+# Blackmagic SDK: only the headers/IDL are needed to build
+sdk/*.pdf
+sdk/*.rtf
+sdk/*/*/Samples/
