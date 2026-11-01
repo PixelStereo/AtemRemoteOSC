@@ -1,11 +1,7 @@
 # Created by http://gitignore.io
 
-### Xcode ###
+### build ###
 build
-*.xcodeproj/*
-!*.xcodeproj/project.pbxproj
-!*.xcworkspace/contents.xcworkspacedata
-
 
 ### Objective-C ###
 # Xcode
