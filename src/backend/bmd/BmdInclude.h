@@ -10,3 +10,10 @@
 #else
     // Dummy / fallback declarations if needed
 #endif
+
+// The SDK's boolean: a BOOL (int) in the Windows COM interfaces, a plain bool on macOS
+#if defined(_WIN32)
+using BmdBool = BOOL;
+#else
+using BmdBool = bool;
+#endif

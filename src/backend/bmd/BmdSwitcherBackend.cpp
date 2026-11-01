@@ -396,7 +396,7 @@ void BmdSwitcherBackend::requestStatus() {
         double pos;
         if (SUCCEEDED(me->GetTransitionPosition(&pos))) state.transitionPosition = static_cast<float>(pos);
 
-        bool ftb;
+        BmdBool ftb;
         if (SUCCEEDED(me->GetFadeToBlackFullyBlack(&ftb))) state.ftbActive = ftb;
 
         m_meMap[state.index] = state;
@@ -473,7 +473,7 @@ void BmdSwitcherBackend::pollState(bool force) {
         Atem::MeState s = m_meMap.value(meIdx);
         s.index = meIdx;
 
-        bool b = false; double pos = 0; BMDSwitcherInputId in = 0; uint32_t frames = 0;
+        BmdBool b = false; double pos = 0; BMDSwitcherInputId in = 0; uint32_t frames = 0;
         if (SUCCEEDED(me->GetProgramInput(&in))) s.programInput = in;
         if (SUCCEEDED(me->GetPreviewInput(&in))) s.previewInput = in;
         if (SUCCEEDED(me->GetTransitionPosition(&pos))) s.transitionPosition = static_cast<float>(pos);
@@ -529,7 +529,7 @@ void BmdSwitcherBackend::pollState(bool force) {
     // Display clock
     if (m_clock) {
         Atem::DisplayClockState s;
-        bool b = false; uint16_t u = 0; double v = 0; uint8_t h = 0, mi = 0, se = 0, fr = 0;
+        BmdBool b = false; uint16_t u = 0; double v = 0; uint8_t h = 0, mi = 0, se = 0, fr = 0;
         BMDSwitcherDisplayClockMode mode = bmdSwitcherDisplayClockModeTimeOfDay;
         BMDSwitcherDisplayClockState cs = bmdSwitcherDisplayClockStateStopped;
         if (SUCCEEDED(m_clock->GetEnabled(&b))) s.enabled = b;
@@ -552,7 +552,7 @@ void BmdSwitcherBackend::pollState(bool force) {
     // Recording
     if (m_record) {
         Atem::RecordState s;
-        BMDSwitcherRecordAVState st; BMDSwitcherRecordAVError err; bool b = false; uint32_t u = 0;
+        BMDSwitcherRecordAVState st; BMDSwitcherRecordAVError err; BmdBool b = false; uint32_t u = 0;
         if (SUCCEEDED(m_record->GetStatus(&st, &err))) s.isRecording = (st == bmdSwitcherRecordAVStateRecording);
         if (SUCCEEDED(m_record->GetRecordAllISOInputs(&b))) s.recordAllInputsIso = b;
         if (SUCCEEDED(m_record->GetTotalRecordingTimeAvailable(&u))) s.remainingTimeSeconds = u;
@@ -629,7 +629,7 @@ void BmdSwitcherBackend::pollState(bool force) {
             s.meIndex = meIdx;
             s.keyerIndex = keyIdx;
 
-            bool b = false; double v = 0; BMDSwitcherInputId in = 0; BMDSwitcherKeyType type = bmdSwitcherKeyTypeLuma;
+            BmdBool b = false; double v = 0; BMDSwitcherInputId in = 0; BMDSwitcherKeyType type = bmdSwitcherKeyTypeLuma;
             if (SUCCEEDED(key->GetOnAir(&b))) s.onAir = b;
             s.tie = (nextSelection & (1u << keyIdx)) != 0;
             if (SUCCEEDED(key->GetType(&type))) {
@@ -690,7 +690,7 @@ void BmdSwitcherBackend::pollState(bool force) {
         auto *dsk = m_dsks[i];
         Atem::DskState s;
         s.index = static_cast<int>(i) + 1;
-        bool b = false; double v = 0; uint32_t u = 0; BMDSwitcherInputId in = 0;
+        BmdBool b = false; double v = 0; uint32_t u = 0; BMDSwitcherInputId in = 0;
         if (SUCCEEDED(dsk->GetOnAir(&b))) s.onAir = b;
         if (SUCCEEDED(dsk->GetTie(&b))) s.tie = b;
         if (SUCCEEDED(dsk->IsAutoTransitioning(&b))) s.isAutoTransitioning = b;
@@ -730,7 +730,7 @@ void BmdSwitcherBackend::pollState(bool force) {
         if (!box) continue;
         Atem::SuperSourceBoxState s;
         s.boxIndex = i + 1;
-        bool b = false; double v = 0; BMDSwitcherInputId in = 0;
+        BmdBool b = false; double v = 0; BMDSwitcherInputId in = 0;
         if (SUCCEEDED(box->GetEnabled(&b))) s.enabled = b;
         if (SUCCEEDED(box->GetInputSource(&in))) s.inputSource = in;
         if (SUCCEEDED(box->GetPositionX(&v))) s.x = static_cast<float>(v);
@@ -797,7 +797,7 @@ void BmdSwitcherBackend::pollState(bool force) {
                 snap.append(double(in));
             }
         }
-        bool b = false;
+        BmdBool b = false;
         if (SUCCEEDED(mv->GetSafeAreaEnabled(0, &b))) s.safeAreaVisible = b;
         snap.append(b ? 1.0 : 0.0);
         b = false;
@@ -838,7 +838,7 @@ void BmdSwitcherBackend::pollState(bool force) {
         for (uint32_t i = 0; i < maxCount; ++i) {
             Atem::MacroState s;
             s.index = i;
-            bool valid = false;
+            BmdBool valid = false;
             if (SUCCEEDED(m_macroPool->IsValid(i, &valid))) s.isValid = valid;
             if (valid) {
                 NativeString name = nullptr, desc = nullptr;
@@ -1987,7 +1987,7 @@ void BmdSwitcherBackend::setCameraFocus(int camera, float value) {
 
 void BmdSwitcherBackend::triggerCameraAutoFocus(int camera) {
     if (!m_cameraControl) return;
-    const bool trigger = true;
+    const BmdBool trigger = true;
     m_cameraControl->SetFlags(camera, CamCtl::Lens, CamCtl::LensAutoFocus, 1, &trigger);
 }
 
@@ -2126,7 +2126,7 @@ void BmdSwitcherBackend::onMeUpdated(int meIndex, BMDSwitcherMixEffectBlockEvent
             double pos;
             if (SUCCEEDED(me->GetTransitionPosition(&pos))) state.transitionPosition = static_cast<float>(pos);
         } else if (eventType == bmdSwitcherMixEffectBlockEventTypeFadeToBlackFullyBlackChanged) {
-            bool ftb;
+            BmdBool ftb;
             if (SUCCEEDED(me->GetFadeToBlackFullyBlack(&ftb))) state.ftbActive = ftb;
         }
 
