@@ -21,7 +21,7 @@ jobs:
       matrix:
         include:
           - name: macOS
-            os: macos-14
+            os: macos-15
             asset: AtemRemoteOsc-${{ github.ref_name }}-macOS.dmg
           - name: Windows
             os: windows-2022
