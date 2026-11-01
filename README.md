@@ -1,7 +1,5 @@
 # AtemRemoteOsc
 
-*Version 0 (early development).*
-
 <img alt="AtemRemoteOsc screenshot" src="docs/screenshot.png" width="70%">
 
 AtemRemoteOsc is a network proxy: it listens for commands following the [OSC protocol](http://opensoundcontrol.org/introduction-osc) and executes them on Blackmagic ATEM video switchers, and sends the switcher state back as OSC feedback.
