@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs the build dependencies (Qt 6, CMake, compiler) and builds atemOSC.
+# Installs the build dependencies (Qt 6, CMake, compiler) and builds AtemRemoteOsc.
 #
 #   ./build.sh                 build in ./build (Release)
 #   ./build.sh --debug         Debug build
@@ -125,8 +125,8 @@ if [ "$RUN_TESTS" -eq 1 ]; then
 fi
 
 case "$OS" in
-    Darwin) OUT="$BUILD_DIR/atemOSC.app" ;;
-    MINGW*|MSYS*|CYGWIN*) OUT="$BUILD_DIR/$BUILD_TYPE/atemOSC.exe" ;;
-    *) OUT="$BUILD_DIR/atemOSC" ;;
+    Darwin) OUT="$BUILD_DIR/AtemRemoteOsc.app" ;;
+    MINGW*|MSYS*|CYGWIN*) OUT="$BUILD_DIR/$BUILD_TYPE/AtemRemoteOsc.exe" ;;
+    *) OUT="$BUILD_DIR/AtemRemoteOsc" ;;
 esac
 log "Done: $OUT"

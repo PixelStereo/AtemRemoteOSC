@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(atemOSC VERSION 4.0.0 LANGUAGES C CXX)
+project(AtemRemoteOsc VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,8 +12,8 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
 
 set(SOURCES
     src/main.cpp
-    src/app/AtemOscApp.h
-    src/app/AtemOscApp.cpp
+    src/app/AtemRemoteOscApp.h
+    src/app/AtemRemoteOscApp.cpp
     src/osc/OscTypes.h
     src/osc/OscPacket.h
     src/osc/OscPacket.cpp
@@ -33,6 +33,8 @@ set(SOURCES
     src/backend/network/AtemPacket.cpp
     src/backend/network/NetworkAtemBackend.h
     src/backend/network/NetworkAtemBackend.cpp
+    src/gui/Theme.h
+    src/gui/Theme.cpp
     src/gui/MainWindow.h
     src/gui/MainWindow.cpp
     src/gui/SwitcherListWidget.h
@@ -84,9 +86,9 @@ elseif(WIN32)
     include_directories("${BMD_GEN_DIR}")
 endif()
 
-add_executable(atemOSC ${SOURCES})
+add_executable(AtemRemoteOsc ${SOURCES})
 
-target_link_libraries(atemOSC PRIVATE
+target_link_libraries(AtemRemoteOsc PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
@@ -94,17 +96,17 @@ target_link_libraries(atemOSC PRIVATE
 )
 
 if(APPLE)
-    target_link_libraries(atemOSC PRIVATE "-framework CoreFoundation")
-    set_target_properties(atemOSC PROPERTIES
+    target_link_libraries(AtemRemoteOsc PRIVATE "-framework CoreFoundation")
+    set_target_properties(AtemRemoteOsc PROPERTIES
         MACOSX_BUNDLE TRUE
-        MACOSX_BUNDLE_BUNDLE_NAME "atemOSC"
-        MACOSX_BUNDLE_GUI_IDENTIFIER "com.atemosc.atemOSC"
+        MACOSX_BUNDLE_BUNDLE_NAME "AtemRemoteOsc"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "com.pixelstereo.AtemRemoteOsc"
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
     )
 elseif(WIN32)
-    set_target_properties(atemOSC PROPERTIES WIN32_EXECUTABLE TRUE)
-    target_link_libraries(atemOSC PRIVATE ole32 oleaut32)
+    set_target_properties(AtemRemoteOsc PROPERTIES WIN32_EXECUTABLE TRUE)
+    target_link_libraries(AtemRemoteOsc PRIVATE ole32 oleaut32)
 endif()
 
 enable_testing()

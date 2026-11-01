@@ -203,7 +203,12 @@ void Dispatcher::dispatchMessage(const Osc::Message &message, const QHostAddress
     }
 
     // Value-in-address form (TouchOSC style): /atem/program/5, /atem/usk/1/type/luma, ...
-    if (message.argumentCount() == 0) {
+    // TouchOSC buttons send 1.0 on press and 0.0 on release together with such an address.
+    const bool numericTrigger = message.argumentCount() == 1 && (arg0.isInt() || arg0.isFloat() || arg0.isBool());
+    if (message.argumentCount() == 0 || numericTrigger) {
+        if (numericTrigger && arg0.toFloat() == 0.0f) {
+            return; // button release
+        }
         const int slash = cmdPath.lastIndexOf('/');
         if (slash > 0) {
             const QString tail = cmdPath.mid(slash + 1);
@@ -478,7 +483,7 @@ bool Dispatcher::handleUsk(SwitcherRoute &r, int me, int key, const QString &sub
         else return false;
         sw->setUskMask(me, key, g[0] != 0.0f, g[1], g[2], g[3], g[4]);
     } else if (sub.startsWith(QLatin1String("dve/")) || sub == QLatin1String("fly/rate")) {
-        emit logMessage(QStringLiteral("USK %1 address /%2 is not implemented by atemOSC yet").arg(key).arg(sub));
+        emit logMessage(QStringLiteral("USK %1 address /%2 is not implemented by AtemRemoteOsc yet").arg(key).arg(sub));
     } else {
         return false;
     }
@@ -1008,6 +1013,7 @@ void Dispatcher::onRecordStateChanged(const Atem::RecordState &state) {
     if (!backend) return;
 
     sendFeedback(backend, QStringLiteral("/recording/status"), { Value(state.isRecording) });
+    sendFeedback(backend, QStringLiteral("/recording/active"), { Value(state.isRecording) });
     sendFeedback(backend, QStringLiteral("/recording/state"), { Value(state.isRecording ? QStringLiteral("recording") : QStringLiteral("idle")) });
     sendFeedback(backend, QStringLiteral("/recording/filename"), { Value(state.filename) });
     sendFeedback(backend, QStringLiteral("/recording/duration"), { Value(static_cast<int32_t>(state.durationSeconds)) });
@@ -1023,6 +1029,7 @@ void Dispatcher::onStreamStateChanged(const Atem::StreamState &state) {
     if (!backend) return;
 
     sendFeedback(backend, QStringLiteral("/stream/status"), { Value(state.isStreaming) });
+    sendFeedback(backend, QStringLiteral("/stream/active"), { Value(state.isStreaming) });
     sendFeedback(backend, QStringLiteral("/stream/state"), { Value(state.isStreaming ? QStringLiteral("streaming") : QStringLiteral("idle")) });
     sendFeedback(backend, QStringLiteral("/stream/bitrate"), { Value(static_cast<int32_t>(state.bitrate)) });
     sendFeedback(backend, QStringLiteral("/stream/cache"), { Value(state.cachePercentage) });

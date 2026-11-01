@@ -198,6 +198,12 @@ private slots:
         QCOMPARE(backend.calls, (QStringList{"program 1 5", "type 1 1 1"}));
         backend.calls.clear();
 
+        // TouchOSC: value in the address plus a 1.0 press / 0.0 release
+        send("/atem/program/7", 1.0f);
+        send("/atem/program/8", 0.0f);
+        QCOMPARE(backend.calls, (QStringList{"program 1 7"}));
+        backend.calls.clear();
+
         // Toggle uses the last known state
         send("/atem/usk/2/on-air", true);
         send("/atem/usk/2/on-air/toggle");

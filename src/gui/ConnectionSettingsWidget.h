@@ -7,12 +7,12 @@
 #include <QPushButton>
 #include <QLabel>
 #include <QComboBox>
-#include "../app/AtemOscApp.h"
+#include "../app/AtemRemoteOscApp.h"
 
 class ConnectionSettingsWidget : public QWidget {
     Q_OBJECT
 public:
-    explicit ConnectionSettingsWidget(AtemOscApp *app, QWidget *parent = nullptr);
+    explicit ConnectionSettingsWidget(AtemRemoteOscApp *app, QWidget *parent = nullptr);
 
     void setSwitcherIndex(int index);
 
@@ -24,7 +24,7 @@ private slots:
 private:
     void updateUiFromConfig();
 
-    AtemOscApp *m_app = nullptr;
+    AtemRemoteOscApp *m_app = nullptr;
     int m_currentIndex = -1;
 
     QLabel *m_lblSwitcherName = nullptr;

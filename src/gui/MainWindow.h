@@ -6,7 +6,7 @@
 #include <QSpinBox>
 #include <QPushButton>
 #include <QLabel>
-#include "../app/AtemOscApp.h"
+#include "../app/AtemRemoteOscApp.h"
 #include "SwitcherListWidget.h"
 #include "ConnectionSettingsWidget.h"
 #include "OscAddressBrowserWidget.h"
@@ -15,7 +15,7 @@
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
-    explicit MainWindow(AtemOscApp *app, QWidget *parent = nullptr);
+    explicit MainWindow(AtemRemoteOscApp *app, QWidget *parent = nullptr);
     ~MainWindow() override;
 
 protected:
@@ -30,7 +30,7 @@ private:
     void setupUi();
     void updateServerStatusUi(bool listening, quint16 port);
 
-    AtemOscApp *m_app = nullptr;
+    AtemRemoteOscApp *m_app = nullptr;
 
     QSplitter *m_mainSplitter = nullptr;
     QSplitter *m_topSplitter = nullptr;

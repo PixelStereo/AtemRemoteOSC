@@ -25,7 +25,7 @@ static QIcon createStatusIcon(Atem::ConnectionState state) {
     return QIcon(pixmap);
 }
 
-SwitcherListWidget::SwitcherListWidget(AtemOscApp *app, QWidget *parent)
+SwitcherListWidget::SwitcherListWidget(AtemRemoteOscApp *app, QWidget *parent)
     : QWidget(parent)
     , m_app(app)
 {
@@ -58,8 +58,8 @@ SwitcherListWidget::SwitcherListWidget(AtemOscApp *app, QWidget *parent)
     connect(m_btnRemove, &QPushButton::clicked, this, &SwitcherListWidget::onRemoveClicked);
     connect(m_list, &QListWidget::itemSelectionChanged, this, &SwitcherListWidget::onItemSelectionChanged);
 
-    connect(m_app, &AtemOscApp::switcherListChanged, this, &SwitcherListWidget::refreshList);
-    connect(m_app, &AtemOscApp::switcherUpdated, this, &SwitcherListWidget::refreshList);
+    connect(m_app, &AtemRemoteOscApp::switcherListChanged, this, &SwitcherListWidget::refreshList);
+    connect(m_app, &AtemRemoteOscApp::switcherUpdated, this, &SwitcherListWidget::refreshList);
 
     refreshList();
 }

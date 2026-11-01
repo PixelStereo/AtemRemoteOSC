@@ -1,36 +1,100 @@
-atemOSC is a network proxy, listening for commands following the [OSC protocol](http://opensoundcontrol.org/introduction-osc) and executing those commands on Blackmagic ATEM video switchers.  
+# AtemRemoteOsc
 
-<img alt="atemOSC Screenshot" src="https://github.com/SteffeyDev/atemOSC/raw/master/atemOSC.png" width="70%">
+*Version 0 (early development).*
 
-## Download the App
+<img alt="AtemRemoteOsc screenshot" src="docs/screenshot.png" width="70%">
 
-[Download Latest Version](http://www.atemosc.com/download.html)
+AtemRemoteOsc is a network proxy: it listens for commands following the [OSC protocol](http://opensoundcontrol.org/introduction-osc) and executes them on Blackmagic ATEM video switchers, and sends the switcher state back as OSC feedback.
 
-For best results, run the latest version of atemOSC, make sure your switcher(s) is running the latest version of the ATEM firmware, and make sure that the Mac that atemOSC is running on has the latest version of ATEM Software Control installed (or at least the same version as the switcher firmware, if the switcher does not support the latest version).
+## Where this comes from, and what changed
 
-Download older or pre-release versions:
-1. Go to the [releases page](https://github.com/SteffeyDev/atemOSC/releases)
-2. For a version that supports older versions of the Atem SDK, scroll down until you find the release for the version you want.
-3. Under `Assets`, select `atemOSC_[version].dmg`
+atemOSC was created by [Daniel Büchele](https://github.com/danielbuechele) and maintained for years by [Peter Steffey](https://github.com/SteffeyDev/atemOSC) with many contributors (Blair McMillan, John Barker and others). The last free and open-source release, **4.2**, is a **macOS-only** Objective-C++/Cocoa application built with Xcode, using the VVOSC framework and the Blackmagic SDK.
+
+Peter Steffey has since moved atemOSC to a paid version 5. This fork starts from the open-source code of 4.2 and **changes course**: it is a complete rewrite in **C++17 / Qt 6** with CMake, kept free and open.
+
+To avoid any confusion with the original project and its version numbers, this fork has its own name, **AtemRemoteOsc**, and starts again at **version 0**.
+
+> **A word of thanks.** The aim of this project is not to belittle Peter Steffey's work, nor that of the other contributors. atemOSC exists, and is as good as it is, thanks to years of generous effort on their part, and everything here stands on the shoulders of that work. Anyone who wants the official, supported, actively developed atemOSC on macOS should go to [atemosc.com](https://www.atemosc.com) and support the original author. This fork simply offers a *different* alternative, with other priorities: cross-platform (Windows and Linux), free and open source, and a wider coverage of the Blackmagic SDK. Thank you, Peter, for all of it.
+
+
+| | 4.2 (SteffeyDev, last open-source release) | AtemRemoteOsc (this fork) |
+|---|---|---|
+| Platforms | macOS | **macOS, Windows, Linux** |
+| Language / UI | Objective-C++, Cocoa, Xcode | C++17, Qt 6 Widgets, CMake |
+| OSC engine | VVOSC | Own implementation on `QUdpSocket` (messages and bundles) |
+| Switcher access | Blackmagic SDK (macOS) | Blackmagic SDK 11.0 on macOS/Windows, **direct UDP protocol on Linux** (no Blackmagic software needed) |
+| Feedback | Callback based, partial | Whole state polled and diffed, sent as soon as it changes |
+| Releases | Manual, notarized | GitHub Actions builds for the three platforms on every `vX` tag |
+
+The OSC address scheme of 4.2 is **kept**, so existing TouchOSC / Open Stage Control / QLab / OSCulator setups and the layouts in `samples/` keep working (default M/E aliases such as `/atem/usk/1/tie/toggle`, value-in-address form with TouchOSC press/release handling, `led/green|red`, `tie/set-next`, ...).
+
+### What is new compared to 4.2
+
+ - **Windows and Linux support** (Linux uses a built-in implementation of the ATEM UDP protocol on port 9910).
+ - **Camera control and PTZ**: iris, focus, autofocus, gain, shutter, white balance, PTZ speed and presets, with feedback.
+ - **Fairlight audio**: solo, analog preamp / phantom / low-cut, 6-band EQ, compressor, limiter, expander.
+ - **MultiView**: layout, per-window source, safe area, VU meters.
+ - **Display clock**: time of day, countdown, count-up, start/stop/reset, size, position, opacity.
+ - **Recording / streaming**: ISO recording, disk switch, stream service, URL and key.
+ - **More keyer control**: advanced chroma sample, mask top/bottom/left/right on USK and DSK, full SuperSource box crop and border.
+ - **Converted video modes** on aux outputs and stills capture (SDK 11.0).
+ - **Complete feedback**: every value above is reported, on change and on request.
+ - **Partial updates**: changing one parameter of a group (EQ band, mask, clock layout, PTZ...) no longer resets the others.
+ - **Auto reconnect**, connection on launch, per-switcher backend choice (SDK or direct network).
+ - **Robust OSC decoding**: malformed packets and deeply nested bundles are rejected instead of misparsed.
+ - Unit tests (`ctest`) covering OSC encoding/decoding, the ATEM packet layer, address handling and parameter merging.
+
+## Current limitations
+
+ - This rewrite is **young**. It compiles and its tests pass on macOS, but it has **not been validated against a real switcher yet**. The Windows build has never been compiled. Please report problems.
+ - The **Linux direct-network backend** supports program/preview, transitions, keyers (on-air, tie, type, sources), downstream keyers, aux, macros, recording and streaming start/stop, classic audio, MultiView window sources and media player selection. Other features (Fairlight, camera, clock, SuperSource, HyperDeck, luma/chroma/fly/mask parameters) log "not available with the direct network backend" instead of acting. The protocol command codes were written from memory of the ATEM protocol and still have to be confirmed on hardware.
+ - Not implemented yet: USK DVE border parameters, fly rate, `audio/output/balance`, DVE and stinger transition parameters, Fairlight and HyperDeck feedback.
+ - Builds are not code-signed or notarized (macOS will show a Gatekeeper warning on first launch: right click, Open).
+
+## Download
+
+Prebuilt macOS (`.dmg`), Windows (`.zip`) and Linux (`.tar.gz`, requires Qt 6) packages are attached to each release on the [releases page](https://github.com/PixelStereo/AtemRemoteOsc/releases).
+
+## Build from source
+
+The Blackmagic SDK 11.0 headers needed on macOS and Windows are included in `sdk/` (they are distributed under Blackmagic's permissive license, notice kept in each file).
+
+```bash
+./build.sh            # installs dependencies (Homebrew / apt / dnf / pacman / zypper), builds and runs the tests
+```
+
+Options: `--debug`, `--clean`, `--no-deps`, `--no-test`. On Windows, run it from Git Bash with Qt and Visual Studio installed and set `QT_DIR` (for example `QT_DIR=C:/Qt/6.7.3/msvc2019_64 ./build.sh --no-deps`).
+
+Manually: Qt 6.2+ (Core, Gui, Widgets, Network, Test), CMake 3.16+, a C++17 compiler.
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
+
+### Releasing
+
+Push a tag starting with `v` (for example `git tag v0.1.0 && git push origin v0.1.0`). The workflow in `.github/workflows/release.yml` builds, tests and packages the three platforms and publishes the GitHub release.
 
 ## Setup and Usage
 
-After launching the application, enter the IP address of the switcher and which local port to listen on (default 3333), and then send OSC commands to the IP address of the computer running atemOSC that port.  If you set an outgoing IP address and port, atemOSC will send status updates and feedback OSC messages to the IP address and port you specified.
+After launching the application, enter the IP address of the switcher, choose the backend (the official SDK on macOS / Windows, direct network on Linux) and which local port to listen on (default 3333), and then send OSC commands to the IP address of the computer running AtemRemoteOsc that port.  If you set an outgoing IP address and port, AtemRemoteOsc will send status updates and feedback OSC messages to the IP address and port you specified.
 
-**If you are sending atemOSC messages from a queueing software or translation software on the same computer that atemOSC is running on**, make sure to send messages to `127.0.0.1` (localhost) on the port that atemOSC is listening on.
+**If you are sending AtemRemoteOsc messages from a queueing software or translation software on the same computer that AtemRemoteOsc is running on**, make sure to send messages to `127.0.0.1` (localhost) on the port that AtemRemoteOsc is listening on.
 
-**If you are sending atemOSC messages from another device**, you will need to send it to the IP address of the computer running atemOSC on the port that atemOSC is listening on.  You can find the IP address of a macOS computer by going to `System Preferences` > `Network` or by running `ifconfig` in a terminal window.
+**If you are sending AtemRemoteOsc messages from another device**, you will need to send it to the IP address of the computer running AtemRemoteOsc on the port that AtemRemoteOsc is listening on.  You can find the IP address of your computer in the system network settings, or by running `ifconfig` (macOS / Linux) or `ipconfig` (Windows) in a terminal.
 
-**If you would like to send OSC from AppleScript or Terminal commands**, you can download and use the [sendosc](https://github.com/yoggy/sendosc) command.  See the [actionscript example](https://github.com/SteffeyDev/atemOSC/blob/master/samples/controllermate-actionscript.txt) in this repository for an example of using AppleScript and sendOSC.  SendOSC also enables using AtemOSC with [ControllerMate](http://www.orderedbytes.com/controllermate/) and [X-keys](http://xkeys.com/XkeysKeyboards/index.php).
+**If you would like to send OSC from AppleScript or Terminal commands**, you can download and use the [sendosc](https://github.com/yoggy/sendosc) command.  See the [actionscript example](samples/controllermate-actionscript.txt) in this repository for an example of using AppleScript and sendOSC.  SendOSC also enables using AtemRemoteOsc with [ControllerMate](http://www.orderedbytes.com/controllermate/) and [X-keys](http://xkeys.com/XkeysKeyboards/index.php).
 
-**If you would like to control your switcher using a MIDI board or device**, consider pairing this software with [OSCulator](https://osculator.net) or [MidiPipe](http://www.subtlesoft.square7.net/MidiPipe.html).  If you would like to control AtemOSC directly using MIDI, comment on [Issue #111](https://github.com/SteffeyDev/atemOSC/issues/111) to let us know.
+**If you would like to control your switcher using a MIDI board or device**, consider pairing this software with [OSCulator](https://osculator.net) or [MidiPipe](http://www.subtlesoft.square7.net/MidiPipe.html).  If you would like to control AtemRemoteOsc directly using MIDI, comment on [Issue #111](https://github.com/SteffeyDev/atemOSC/issues/111) to let us know.
 
 **If you would like to control your switcher using a mobile device**, you can use [TouchOSC](https://hexler.net/products/touchosc) or [Open Stage Control](https://openstagecontrol.ammd.net).
 
- - Open Stage Control Layout by Peter Steffey: [https://github.com/SteffeyDev/atemOSC/blob/master/samples/open-stage-control.json](https://github.com/SteffeyDev/atemOSC/blob/master/samples/open-stage-control.json)
- - TouchOSC Layout (iPad) by Peter Steffey: [https://github.com/SteffeyDev/atemOSC/blob/master/samples/ipad-layout.touchosc](https://github.com/SteffeyDev/atemOSC/blob/master/samples/ipad-layout.touchosc)
+ - Open Stage Control Layout by Peter Steffey: [samples/open-stage-control.json](samples/open-stage-control.json)
+ - TouchOSC Layout (iPad) by Peter Steffey: [samples/ipad-layout.touchosc](samples/ipad-layout.touchosc)
  - TouchOSC Layout (iPad) by mkcologne: [https://github.com/mkcologne/atemMiniTouchOSC](https://github.com/mkcologne/atemMiniTouchOSC)
- - TouchOSC Layout (iPhone): [https://github.com/SteffeyDev/atemOSC/blob/master/samples/iphone-layout.touchosc](https://github.com/SteffeyDev/atemOSC/blob/master/samples/iphone-layout.touchosc)
+ - TouchOSC Layout (iPhone): [samples/iphone-layout.touchosc](samples/iphone-layout.touchosc)
 
 ## Videos & Guides
 
@@ -50,15 +114,15 @@ After launching the application, enter the IP address of the switcher and which 
 
 ## OSC API
 
-The full list of the OSC-addresses available for your switcher can be obtained by going to the "OSC Addresses" tab once you've connected atemOSC to your switcher. The list below is just an overview of what the addresses may look like for a generic switcher.
+The full list of the OSC-addresses available for your switcher can be obtained by going to the "OSC Addresses" tab once you've connected AtemRemoteOsc to your switcher. The list below is just an overview of what the addresses may look like for a generic switcher.
 
-All addresses must start with `/atem/`.  atemOSC will ignore all OSC commands it receives whose address does not start with `/atem/`.
+All addresses must start with `/atem/`.  AtemRemoteOsc will ignore all OSC commands it receives whose address does not start with `/atem/`.
 
 ### Multi-switcher support
 
 If you only want to connect to a single ATEM switcher, leave the nickname field blank and use the addresses below as normal. By default, all commands without a nickname will be sent to the first switcher with no nickname.
 
-If you connect multiple switchers to atemOSC, you will need to provide a nickname for each switcher and use that nickname in the address to specify which switcher to send the command to. If you add a nickname to a switcher, you **must** send the nickname in the address, and all feedback messages will contain the nickname in the address.
+If you connect multiple switchers to AtemRemoteOsc, you will need to provide a nickname for each switcher and use that nickname in the address to specify which switcher to send the command to. If you add a nickname to a switcher, you **must** send the nickname in the address, and all feedback messages will contain the nickname in the address.
 
 For example, `/atem/my-switcher-1/transition/auto` will trigger an automatic transition on the switcher whose nickname is `my-switcher-1`
 
@@ -370,15 +434,73 @@ Feedback: Stream state sent to address `/atem/stream/state`, will contain a stri
 
   - **Request all feedback available** `/atem/send-status`
      - This will query the switcher and send back the status for the program/preview, transition control, keyers, and macros
-     - atemOSC will also `/atem/led/green` with a float value of 1.0 if connected and 0.0 if disconnected, and `/atem/led/red` with the inverse float value.  These `led` messages are also sent whenever the connection status changes.
+     - AtemRemoteOsc will also `/atem/led/green` with a float value of 1.0 if connected and 0.0 if disconnected, and `/atem/led/red` with the inverse float value.  These `led` messages are also sent whenever the connection status changes.
   - **Request only Program/Preview/Bar status** `/atem/me/$i/send-status`
      - Where `$i` is an integer value specifying the M/E to get the status of
      - This will query the switcher and send back the status for only program/preview, bar, and preview
   - This can be used when a new OSC client device is brought online, so that it gets the current status of the system
 
+### Camera Control & PTZ (new)
+
+Requires the SDK backend (macOS / Windows). `$i` is the camera number configured on the switcher.
+
+ - **Iris** `/atem/camera/$i/iris <0.0-1.0>`
+ - **Focus** `/atem/camera/$i/focus <0.0-1.0>`
+ - **One-shot autofocus** `/atem/camera/$i/autofocus`
+ - **Gain in dB** `/atem/camera/$i/gain <int>`
+ - **Shutter speed** `/atem/camera/$i/shutter <int>` (denominator: `60` means 1/60 s)
+ - **White balance in Kelvin** `/atem/camera/$i/white-balance <int>`
+ - **PTZ speed** `/atem/camera/$i/ptz/pan`, `/ptz/tilt`, `/ptz/zoom` with `<-1.0 to 1.0>` (`0` stops the movement)
+ - **Recall PTZ preset** `/atem/camera/$i/ptz/recall <int>`
+
+Feedback: iris, focus, gain, shutter and white-balance.
+
+### Fairlight Audio, EQ & Dynamics (new)
+
+On top of gain / balance / mix, per audio input `$i`:
+
+ - **Solo** `/atem/audio/input/$i/solo <bool>`
+ - **Analog input** `/atem/audio/input/$i/preamp <dB>`, `/mic-level <bool>`, `/phantom <bool>`, `/low-cut <bool>`
+ - **EQ band `$b`** (0-5) `/atem/audio/input/$i/eq/$b/enabled|freq|gain|q` and `/atem/audio/input/$i/eq/reset`
+ - **Compressor** `/atem/audio/input/$i/compressor/enabled|threshold|ratio|attack|release`
+ - **Limiter** `/atem/audio/input/$i/limiter/enabled|threshold|attack|release`
+ - **Expander / gate** `/atem/audio/input/$i/expander/enabled|threshold|range|ratio`
+
+Several addresses map to one SDK call that takes all the parameters of a group (an EQ band, the compressor, a mask...). AtemRemoteOsc keeps the last known values of each group, so you can change one parameter at a time. Parameters never sent and never reported by the switcher use neutral defaults.
+
+### MultiView (new)
+
+ - **Layout** `/atem/multiview/$m/layout <top|bottom|left|right>` (more layouts on SDK versions that expose them)
+ - **Window source** `/atem/multiview/$m/window/$w/source <int>`
+ - **Safe area** `/atem/multiview/$m/safe-area <bool>`, **VU meters** `/atem/multiview/$m/meters <bool>`
+
+### Display Clock (new)
+
+ - `/atem/clock/enabled <bool>`, `/atem/clock/mode <timeofday|countdown|countup>`
+ - `/atem/clock/start`, `/atem/clock/stop`, `/atem/clock/reset`
+ - `/atem/clock/time <HH:MM:SS>`, `/atem/clock/size`, `/atem/clock/opacity`, `/atem/clock/x`, `/atem/clock/y`
+
+### Recording, Streaming & Media (new)
+
+ - `/atem/recording/iso <bool>`, `/atem/recording/switch-disk`
+ - `/atem/stream/service <string>`, `/atem/stream/url <string>`, `/atem/stream/key <string>`
+ - `/atem/mplayer/capture` captures the current output into the media pool
+ - `/atem/aux/$i/converted-videomode <int>` sets the video mode of a converted aux output (SDK 11.0)
+
+### More keyer & SuperSource addresses (new)
+
+ - `/atem/usk/$i/chroma/sample-x|sample-y` (advanced chroma sample position), `/atem/usk/$i/mask/top|bottom|left|right`
+ - `/atem/dsk/$i/mask/top|bottom|left|right`
+ - `/atem/supersource/box/$i/x|y|size|cropped|crop-top|crop-bottom|crop-left|crop-right|crop-reset` (the legacy `/atem/supersource/$i/enabled|source` still work)
+ - `/atem/supersource/border/enabled|width-in|width-out|softness-in|softness-out|hue|saturation|luma`
+
+### Feedback
+
+AtemRemoteOsc reads the whole switcher state every 100 ms and sends an OSC message for every value that changed, plus everything on connection and on `/atem/send-status`. Feedback covers M/E (program, preview, T-bar, FTB, transition type/rate/preview), upstream keyers (on-air, tie, type, sources, luma, chroma, mask, fly), downstream keyers, aux, SuperSource boxes, audio, MultiView, display clock, recording, streaming, macros, camera control and input names.
+
 ### Type Casting
 
-For your convenience, atemOSC will cast certain types to the correct type for certain endpoints
+For your convenience, AtemRemoteOsc will cast certain types to the correct type for certain endpoints
 
  - If you pass an int or float value of 0 to a boolean method, the 0 will be interpreted as false
  - If you pass an int or float value of 1 to a boolean method, the 1 will be interpreted as true
@@ -386,26 +508,26 @@ For your convenience, atemOSC will cast certain types to the correct type for ce
 
 ### TouchOSC Support
 
-Due to the limited capabilities of the TouchOSC client, atemOSC supports an alternative form of passing values.  For any method listed above that requires a string or int value, you can pass the string or int as part of the address instead of as a value.  For example, you can send `/atem/transition/type/wipe` instead of `/atem/transition/type wipe`, or send `/atem/usk/1/source/fill/3` instead of `/atem/usk/1/source/fill 3`.  Additionally, any command sent with one of these alternative addresses and a float value of `0.0` will be ignored, as that represents a button release and commonly causes issues.  If you would like to trigger a change on button release instead of button press, simply flip the values in the TouchOSC Editor.
+Due to the limited capabilities of the TouchOSC client, AtemRemoteOsc supports an alternative form of passing values.  For any method listed above that requires a string or int value, you can pass the string or int as part of the address instead of as a value.  For example, you can send `/atem/transition/type/wipe` instead of `/atem/transition/type wipe`, or send `/atem/usk/1/source/fill/3` instead of `/atem/usk/1/source/fill 3`.  Additionally, any command sent with one of these alternative addresses and a float value of `0.0` will be ignored, as that represents a button release and commonly causes issues.  If you would like to trigger a change on button release instead of button press, simply flip the values in the TouchOSC Editor.
 
 ----------
 
 ## Common Issues
 
-### I want to use \<insert feature here\> that AtemOSC does not support yet
+### I want to use \<insert feature here\> that AtemRemoteOsc does not support yet
 
 #### Problem
 
-There are a lot of features that AtemOSC does not yet support, most noteably camera control and advanced USK settings.
+A few features are still missing (see [Current limitations](#current-limitations)), most notably DVE/stinger transition parameters and some Fairlight and HyperDeck feedback.
 
 #### Solution
 
-You are free to open an issue or comment on and existing issue, but the quickest solution for you is to create a **macro** in ATEM Software Control that accomplishes the task you would like and call the **macro** using AtemOSC.
+You are free to open an issue or comment on and existing issue, but the quickest solution for you is to create a **macro** in ATEM Software Control that accomplishes the task you would like and call the **macro** using AtemRemoteOsc.
 
-### Auto and cut commands don’t seem to work, or look buggy, when combining atemOSC with MIDI control
+### Auto and cut commands don’t seem to work, or look buggy, when combining AtemRemoteOsc with MIDI control
 
 #### Problem
-A lot of MIDI controls send two signals when a button is pressed, one signal when you press down, and another when you release. If you connect the button the `/atem/transition/auto` or `cut`, atemOSC recieves both events and attempts to send the transition command to the switcher twice. This can cause buggy behavior or just not work at all.
+A lot of MIDI controls send two signals when a button is pressed, one signal when you press down, and another when you release. If you connect the button the `/atem/transition/auto` or `cut`, AtemRemoteOsc recieves both events and attempts to send the transition command to the switcher twice. This can cause buggy behavior or just not work at all.
 
 #### Solution
 Tune your MIDI software to send only one of the two signals, either ok button press (rising edge) or button release (falling edge). See [#120](https://github.com/SteffeyDev/atemOSC/issues/120) for instructions for OSCulator.
@@ -421,10 +543,10 @@ Set the IP address to be the broadcast address for your network.  This will caus
 ### I'm having issues connecting to my switcher, or my switcher is connected but certain features don't work
 
 #### Problem
-There are a myriad of issues that can come up with connecting atemOSC to your ATEM switcher.  Even once you get it connected, sometimes certain features that are supported by your switcher (e.g. recording) do not work with atemOSC.
+There are a myriad of issues that can come up with connecting AtemRemoteOsc to your ATEM switcher.  Even once you get it connected, sometimes certain features that are supported by your switcher (e.g. recording) do not work with AtemRemoteOsc.
 
 #### Solution
-If possible, upgrade your switcher's firmware to the latest version supported, and upgrade the version of ATEM Software Control on the Mac that is running atemOSC to match the switcher. AtemOSC does not have any strong ties to the version of your ATEM switcher, so often the issue is that the ATEM Software Control version is out of sync with the ATEM switcher's firmware version, and making those version's match may solve the issue atemOSC is having. If that doesn't fix it, try to find and use the latest version of atemOSC that supports the switcher firmware version you are running.  If you are stuck on an older firmware version, you may have to use a previous version of atemOSC.
+If possible, upgrade your switcher's firmware to the latest version supported, and on macOS and Windows (SDK backend), upgrade the version of ATEM Software Control installed on the computer running AtemRemoteOsc to match the switcher; on Linux, make sure UDP port 9910 is reachable. AtemRemoteOsc does not have any strong ties to the version of your ATEM switcher, so often the issue is that the ATEM Software Control version is out of sync with the ATEM switcher's firmware version, and making those version's match may solve the issue AtemRemoteOsc is having. If that doesn't fix it, try to find and use the latest version of AtemRemoteOsc that supports the switcher firmware version you are running.  If you are stuck on an older firmware version, you may have to use a previous version of AtemRemoteOsc.
 
 -----------
 
@@ -432,28 +554,10 @@ If possible, upgrade your switcher's firmware to the latest version supported, a
 
 I welcome pull requests, but recommend that you open an issue first so that we can discuss the bug or feature before you implement it.
 
+----------
+
 ## Acknowledgements
 
- - Project originally created by [Daniel Büchele](https://github.com/danielbuechele)
- - [VVOSC](http://code.google.com/p/vvopensource/) is used as OSC-framework.
+ - Project originally created by [Daniel Büchele](https://github.com/danielbuechele), then maintained by [Peter Steffey](https://github.com/SteffeyDev) and contributors: see the [upstream repository](https://github.com/SteffeyDev/atemOSC) and the git history.
+ - The Qt rewrite builds on the [Blackmagic ATEM Switchers SDK](https://www.blackmagicdesign.com/developer/) (headers included under their license) and [Qt](https://www.qt.io).
  - Program icon based heavily on the ATEM Software Control icon by [Blackmagic Design](http://www.blackmagicdesign.com).
-
- ----------
-
-## Developer Resources
-
-### Build and run app locally
-
-1. Download and install XCode
-2. Clone repository or download the repository ZIP
-3. Double click the .xcworkspace file to open in XCode
-4. Click on the project, go to the "Signing & Capabilities" tab, change the Team to your personal team, and change Signing Certificate to “Sign to Run Locally”
-5. Click the play button in the top left to run
-
-### Deployment
-
-1. Bump the version in XCode
-2. Archive app from XCode
-3. Generate notarized app by using the "Distribute App" wizard: Developer ID > Upload > Automatically Manage Signing > Upload > Wait for notarization to complete > Export
-3. Run generate-release.sh to generate the notarized installer (argument is path to exported atemOSC.app file from the last step)
-5. Run upload-symbols.sh to upload the symbols to Bugsnag

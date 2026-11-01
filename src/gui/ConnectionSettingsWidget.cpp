@@ -4,7 +4,7 @@
 #include <QFormLayout>
 #include <QGroupBox>
 
-ConnectionSettingsWidget::ConnectionSettingsWidget(AtemOscApp *app, QWidget *parent)
+ConnectionSettingsWidget::ConnectionSettingsWidget(AtemRemoteOscApp *app, QWidget *parent)
     : QWidget(parent)
     , m_app(app)
 {
@@ -44,6 +44,7 @@ ConnectionSettingsWidget::ConnectionSettingsWidget(AtemOscApp *app, QWidget *par
     m_btnConnect = new QPushButton(QStringLiteral("Connect"), this);
     m_btnDisconnect = new QPushButton(QStringLiteral("Disconnect"), this);
     m_btnConnect->setDefault(true);
+    m_btnConnect->setProperty("role", "go");
     btnConnLayout->addWidget(m_btnConnect);
     btnConnLayout->addWidget(m_btnDisconnect);
     btnConnLayout->addStretch();
@@ -86,7 +87,7 @@ ConnectionSettingsWidget::ConnectionSettingsWidget(AtemOscApp *app, QWidget *par
     connect(m_chkAutoReconnect, &QCheckBox::toggled, this, &ConnectionSettingsWidget::applySettings);
     connect(m_cmbBackend, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ConnectionSettingsWidget::applySettings);
 
-    connect(m_app, &AtemOscApp::switcherUpdated, this, [this](int idx) {
+    connect(m_app, &AtemRemoteOscApp::switcherUpdated, this, [this](int idx) {
         if (idx == m_currentIndex) {
             updateUiFromConfig();
         }

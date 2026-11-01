@@ -16,9 +16,6 @@ LogConsoleWidget::LogConsoleWidget(QWidget *parent)
     QFont monoFont(QStringLiteral("Menlo, Consolas, Monaco, monospace"));
     monoFont.setPointSize(11);
     m_console->setFont(monoFont);
-    m_console->setStyleSheet(QStringLiteral(
-        "QPlainTextEdit { background-color: #1e1e1e; color: #d4d4d4; border: 1px solid #333; }"
-    ));
     layout->addWidget(m_console);
 
     auto *bottomBar = new QHBoxLayout;

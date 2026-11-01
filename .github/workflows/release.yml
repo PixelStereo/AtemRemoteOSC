@@ -22,14 +22,14 @@ jobs:
         include:
           - name: macOS
             os: macos-14
-            asset: atemOSC-${{ github.ref_name }}-macOS.dmg
+            asset: AtemRemoteOsc-${{ github.ref_name }}-macOS.dmg
           - name: Windows
             os: windows-2022
             qt_arch: win64_msvc2019_64
-            asset: atemOSC-${{ github.ref_name }}-Windows.zip
+            asset: AtemRemoteOsc-${{ github.ref_name }}-Windows.zip
           - name: Linux
             os: ubuntu-22.04
-            asset: atemOSC-${{ github.ref_name }}-Linux-x86_64.tar.gz
+            asset: AtemRemoteOsc-${{ github.ref_name }}-Linux-x86_64.tar.gz
     steps:
       - uses: actions/checkout@v4
 
@@ -63,25 +63,25 @@ jobs:
       - name: Package (macOS)
         if: matrix.name == 'macOS'
         run: |
-          macdeployqt build/atemOSC.app -dmg
-          mv build/atemOSC.dmg "${{ matrix.asset }}"
+          macdeployqt build/AtemRemoteOsc.app -dmg
+          mv build/AtemRemoteOsc.dmg "${{ matrix.asset }}"
 
       - name: Package (Windows)
         if: matrix.name == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path dist/atemOSC | Out-Null
-          Copy-Item build/Release/atemOSC.exe dist/atemOSC/
-          windeployqt --release --no-translations dist/atemOSC/atemOSC.exe
-          Compress-Archive -Path dist/atemOSC -DestinationPath "${{ matrix.asset }}"
+          New-Item -ItemType Directory -Path dist/AtemRemoteOsc | Out-Null
+          Copy-Item build/Release/AtemRemoteOsc.exe dist/AtemRemoteOsc/
+          windeployqt --release --no-translations dist/AtemRemoteOsc/AtemRemoteOsc.exe
+          Compress-Archive -Path dist/AtemRemoteOsc -DestinationPath "${{ matrix.asset }}"
 
       - name: Package (Linux)
         if: matrix.name == 'Linux'
         run: |
-          mkdir -p dist/atemOSC
-          cp build/atemOSC dist/atemOSC/
-          cp QT_PORT_README.md dist/atemOSC/README.md
-          tar -C dist -czf "${{ matrix.asset }}" atemOSC
+          mkdir -p dist/AtemRemoteOsc
+          cp build/AtemRemoteOsc dist/AtemRemoteOsc/
+          cp README.md dist/AtemRemoteOsc/README.md
+          tar -C dist -czf "${{ matrix.asset }}" AtemRemoteOsc
 
       - uses: actions/upload-artifact@v4
         with:

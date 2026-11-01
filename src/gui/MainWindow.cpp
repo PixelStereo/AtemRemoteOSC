@@ -6,20 +6,20 @@
 #include <QSettings>
 #include <QCloseEvent>
 
-MainWindow::MainWindow(AtemOscApp *app, QWidget *parent)
+MainWindow::MainWindow(AtemRemoteOscApp *app, QWidget *parent)
     : QMainWindow(parent)
     , m_app(app)
 {
     setupUi();
 
-    QSettings settings("atemOSC", "atemOSC");
+    QSettings settings("AtemRemoteOsc", "AtemRemoteOsc");
     restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
 
-    connect(m_app, &AtemOscApp::logMessage, m_logConsole, &LogConsoleWidget::appendLog);
-    connect(m_app, &AtemOscApp::oscServerStateChanged, this, &MainWindow::onOscServerStateChanged);
+    connect(m_app, &AtemRemoteOscApp::logMessage, m_logConsole, &LogConsoleWidget::appendLog);
+    connect(m_app, &AtemRemoteOscApp::oscServerStateChanged, this, &MainWindow::onOscServerStateChanged);
 
     m_logConsole->setLogDebugOsc(m_app->logDebugOsc());
-    connect(m_logConsole, &LogConsoleWidget::logDebugOscChanged, m_app, &AtemOscApp::setLogDebugOsc);
+    connect(m_logConsole, &LogConsoleWidget::logDebugOscChanged, m_app, &AtemRemoteOscApp::setLogDebugOsc);
 
     // Initial server state
     updateServerStatusUi(m_app->isOscServerListening(), m_app->incomingPort());
@@ -34,15 +34,16 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::closeEvent(QCloseEvent *event) {
-    QSettings settings("atemOSC", "atemOSC");
+    QSettings settings("AtemRemoteOsc", "AtemRemoteOsc");
     settings.setValue("mainWindowGeometry", saveGeometry());
     m_app->saveSettings();
     QMainWindow::closeEvent(event);
 }
 
 void MainWindow::setupUi() {
-    setWindowTitle(QStringLiteral("atemOSC – ATEM Switcher OSC Proxy"));
-    setMinimumSize(780, 560);
+    setWindowTitle(QStringLiteral("AtemRemoteOsc – ATEM Switcher OSC Proxy"));
+    setMinimumSize(900, 680);
+    resize(1040, 760);
 
     // 1. Toolbar for global Incoming OSC Port
     auto *toolbar = addToolBar(QStringLiteral("OSC Server"));
