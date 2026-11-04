@@ -42,19 +42,10 @@ bool AtemRemoteOscApp::initialize() {
     // Start listening on configured port
     setIncomingPort(m_incomingPort);
 
-    // If no switchers saved, add a default one
-    if (m_switchers.isEmpty()) {
-        SwitcherConfig def;
-        def.id = QUuid::createUuid().toString();
-        def.ip = QStringLiteral("192.168.10.240");
-        def.outgoingIp = QStringLiteral("127.0.0.1");
-        def.outgoingPort = 53000;
-        addSwitcher(def);
-    }
-
-    // Like the original atemOSC, connect on launch
+    // No switcher is preset: the list starts empty and the user adds one with its own address.
+    // Switchers saved from a previous session are reconnected on launch.
     for (int i = 0; i < m_switchers.size(); ++i) {
-        if (m_switchers[i]->config.autoReconnect) connectSwitcher(i);
+        if (m_switchers[i]->config.autoReconnect && !m_switchers[i]->config.ip.isEmpty()) connectSwitcher(i);
     }
 
     return true;
@@ -168,6 +159,10 @@ void AtemRemoteOscApp::updateSwitcherConfig(int index, const SwitcherConfig &con
 void AtemRemoteOscApp::connectSwitcher(int index) {
     if (index >= 0 && index < m_switchers.size()) {
         auto *inst = m_switchers[index];
+        if (inst->config.ip.trimmed().isEmpty()) {
+            emit logMessage(QStringLiteral("Enter the IP address of the switcher before connecting."));
+            return;
+        }
         inst->userDisconnected = false;
         inst->backend->connectTo(inst->config.ip);
     }
@@ -191,7 +186,7 @@ void AtemRemoteOscApp::loadSettings() {
         m_settings.setArrayIndex(i);
         SwitcherConfig cfg;
         cfg.id = m_settings.value("id").toString();
-        cfg.ip = m_settings.value("ip", "192.168.10.240").toString();
+        cfg.ip = m_settings.value("ip").toString();
         cfg.nickname = m_settings.value("nickname").toString();
         cfg.outgoingIp = m_settings.value("outgoingIp", "127.0.0.1").toString();
         cfg.outgoingPort = static_cast<quint16>(m_settings.value("outgoingPort", 53000).toUInt());

@@ -1,4 +1,5 @@
 #include "SwitcherListWidget.h"
+#include <QSignalBlocker>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QPainter>
@@ -70,6 +71,9 @@ int SwitcherListWidget::selectedIndex() const {
 
 void SwitcherListWidget::refreshList() {
     int current = m_list->currentRow();
+    // Rebuilding the list is not a selection change: without this, every connection state change would
+    // reload the editable fields and overwrite what is being typed
+    const QSignalBlocker blocker(m_list);
     m_list->clear();
 
     const auto &switchers = m_app->switchers();
@@ -91,11 +95,16 @@ void SwitcherListWidget::refreshList() {
     } else if (m_list->count() > 0) {
         m_list->setCurrentRow(0);
     }
+
+    // The very first selection (nothing was selected before) still has to reach the editor
+    if (current < 0 && m_list->count() > 0) {
+        emit selectionChanged(m_list->currentRow());
+    }
 }
 
 void SwitcherListWidget::onAddClicked() {
     SwitcherConfig cfg;
-    cfg.ip = QStringLiteral("192.168.10.240");
+    cfg.ip.clear(); // to be filled in by the user
     cfg.outgoingIp = QStringLiteral("127.0.0.1");
     cfg.outgoingPort = 53000;
     m_app->addSwitcher(cfg);

@@ -89,7 +89,7 @@ ConnectionSettingsWidget::ConnectionSettingsWidget(AtemRemoteOscApp *app, QWidge
 
     connect(m_app, &AtemRemoteOscApp::switcherUpdated, this, [this](int idx) {
         if (idx == m_currentIndex) {
-            updateUiFromConfig();
+            updateStatus();
         }
     });
 }
@@ -121,6 +121,17 @@ void ConnectionSettingsWidget::updateUiFromConfig() {
     int bIdx = m_cmbBackend->findData(static_cast<int>(sw->config.backendType));
     if (bIdx >= 0) m_cmbBackend->setCurrentIndex(bIdx);
 
+    updateStatus();
+
+    m_updating = false;
+}
+
+// Connection state only: never touches the editable fields, so a reconnection attempt in the background
+// cannot overwrite an address while it is being typed.
+void ConnectionSettingsWidget::updateStatus() {
+    if (m_currentIndex < 0 || m_currentIndex >= m_app->switchers().size()) return;
+    auto *sw = m_app->switchers()[m_currentIndex];
+
     if (sw->backend) {
         m_lblSwitcherName->setText(sw->backend->switcherName());
         Atem::ConnectionState st = sw->backend->connectionState();
@@ -142,8 +153,6 @@ void ConnectionSettingsWidget::updateUiFromConfig() {
             m_btnDisconnect->setEnabled(false);
         }
     }
-
-    m_updating = false;
 }
 
 void ConnectionSettingsWidget::applySettings() {

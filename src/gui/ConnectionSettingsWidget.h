@@ -23,6 +23,7 @@ private slots:
 
 private:
     void updateUiFromConfig();
+    void updateStatus();
 
     AtemRemoteOscApp *m_app = nullptr;
     int m_currentIndex = -1;

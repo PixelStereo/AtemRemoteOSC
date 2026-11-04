@@ -13,7 +13,7 @@
 
 struct SwitcherConfig {
     QString id;
-    QString ip = "192.168.10.240";
+    QString ip;
     QString nickname;
     QString outgoingIp = "127.0.0.1";
     quint16 outgoingPort = 53000;
