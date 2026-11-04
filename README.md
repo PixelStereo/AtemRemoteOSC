@@ -10,7 +10,7 @@ atemOSC was created by [Daniel Büchele](https://github.com/danielbuechele) and 
 
 Peter Steffey has since moved atemOSC to a paid version 5. This fork starts from the open-source code of 4.2 and **changes course**: it is a complete rewrite in **C++17 / Qt 6** with CMake, kept free and open.
 
-To avoid any confusion with the original project and its version numbers, this fork has its own name, **AtemRemoteOsc**, and starts again at **version 0**.
+To avoid any confusion with the original project and its version numbers, this fork has its own name, **AtemRemoteOsc**, and its own releases (currently **5.0.1**).
 
 > **A word of thanks.** The aim of this project is not to belittle Peter Steffey's work, nor that of the other contributors. atemOSC exists, and is as good as it is, thanks to years of generous effort on their part, and everything here stands on the shoulders of that work. Anyone who wants the official, supported, actively developed atemOSC on macOS should go to [atemosc.com](https://www.atemosc.com) and support the original author. This fork simply offers a *different* alternative, with other priorities: cross-platform (Windows and Linux), free and open source, and a wider coverage of the Blackmagic SDK. Thank you, Peter, for all of it.
 
@@ -73,7 +73,7 @@ ctest --test-dir build --output-on-failure
 
 ### Releasing
 
-Push a tag starting with `v` (for example `git tag v0.1.0 && git push origin v0.1.0`). The workflow in `.github/workflows/release.yml` builds, tests and packages the three platforms and publishes the GitHub release.
+Push a tag starting with `v` (for example `git tag v5.0.1 && git push origin v5.0.1`). The workflow in `.github/workflows/release.yml` builds, tests and packages the three platforms and publishes the GitHub release.
 
 ## Setup and Usage
 

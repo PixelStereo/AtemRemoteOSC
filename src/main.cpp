@@ -10,7 +10,7 @@ int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
 
     app.setApplicationName(QStringLiteral("AtemRemoteOsc"));
-    app.setApplicationVersion(QStringLiteral("0.1.0"));
+    app.setApplicationVersion(QStringLiteral("5.0.1"));
     app.setOrganizationName(QStringLiteral("AtemRemoteOsc"));
 
     theme::applyToApplication(app);
