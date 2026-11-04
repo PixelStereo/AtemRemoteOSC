@@ -35,6 +35,10 @@ private:
         QString type;        // OSC type tag, empty when the method takes no argument
         bool feedback = false;
         QString description;
+        bool hasRange = false;
+        double rangeMin = 0.0;
+        double rangeMax = 0.0;
+        QStringList choices;
     };
 
     void rebuildIfNeeded();

@@ -486,7 +486,7 @@ Several addresses map to one SDK call that takes all the parameters of a group (
 
  - `/atem/clock/enabled <bool>`, `/atem/clock/mode <timeofday|countdown|countup>`
  - `/atem/clock/start`, `/atem/clock/stop`, `/atem/clock/reset`
- - `/atem/clock/time <HH:MM:SS>`, `/atem/clock/size`, `/atem/clock/opacity`, `/atem/clock/x`, `/atem/clock/y`
+ - `/atem/clock/time <HH:MM:SS>`, `/atem/clock/size <0.0-1.0>`, `/atem/clock/opacity <0.0-1.0>`, `/atem/clock/x <-16.0 to 16.0>`, `/atem/clock/y <-9.0 to 9.0>`
 
 ### Recording, Streaming & Media (new)
 
@@ -509,6 +509,7 @@ AtemRemoteOsc is also an [OSCQuery](https://github.com/Vidvox/OSCQueryProposal) 
  - Enabled by default, on HTTP port `3334` (checkbox and port in the toolbar).
  - `GET /` returns the whole tree, `GET /atem/me/1/program` one address, `GET /atem/me/1/program?VALUE` its current value (`TYPE`, `ACCESS`, `DESCRIPTION`, `FULL_PATH` work the same way), `GET /?HOST_INFO` the OSC port to send to.
  - The tree follows the connected switcher (number of M/Es, downstream keyers, aux outputs, HyperDecks, macros), and the values are those reported as feedback.
+ - Parameters whose limits are known expose a `RANGE` (`MIN` / `MAX`), so controllers draw a slider, and parameters that take one of a few words (transition type, key type, audio mix, clock mode, MultiView layout) expose the accepted `VALS`. The limits come from the original atemOSC documentation and the Blackmagic SDK; the others are plain number fields.
  - It is read-only: commands still go to the OSC UDP port.
 
 ### Feedback

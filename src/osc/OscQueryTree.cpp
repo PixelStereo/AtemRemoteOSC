@@ -143,6 +143,10 @@ void QueryTree::rebuildIfNeeded()
             leaf.type = typeTag(ep.valueType);
             leaf.feedback = ep.feedback;
             leaf.description = ep.description;
+            leaf.hasRange = ep.hasRange;
+            leaf.rangeMin = ep.rangeMin;
+            leaf.rangeMax = ep.rangeMax;
+            leaf.choices = ep.choices;
             const QStringList paths = expand(ep.pattern, c);
             const QStringList patternParts = ep.pattern.split('/');
             for (const QString &p : paths) {
@@ -174,6 +178,17 @@ QJsonObject QueryTree::leafJson(const QString &path, const Leaf &leaf) const
     if (!leaf.description.isEmpty()) o["DESCRIPTION"] = leaf.description;
     if (!leaf.type.isEmpty()) {
         o["TYPE"] = leaf.type;
+        // One entry per argument: the interval of a number, or the accepted strings
+        if (leaf.hasRange && (leaf.type == QLatin1String("f") || leaf.type == QLatin1String("i"))) {
+            QJsonObject range;
+            range["MIN"] = leaf.rangeMin;
+            range["MAX"] = leaf.rangeMax;
+            o["RANGE"] = QJsonArray{range};
+        } else if (!leaf.choices.isEmpty() && leaf.type == QLatin1String("s")) {
+            QJsonObject range;
+            range["VALS"] = QJsonArray::fromStringList(leaf.choices);
+            o["RANGE"] = QJsonArray{range};
+        }
         if (leaf.feedback) {
             const QVector<Value> last = m_dispatcher->lastFeedback(path);
             if (!last.isEmpty()) {
@@ -252,8 +267,8 @@ bool QueryTree::attribute(const QString &path, const QString &attributeName, QJs
 QJsonObject QueryTree::hostInfo(const QString &name, quint16 oscPort) const
 {
     QJsonObject extensions;
-    for (const char *k : {"ACCESS", "VALUE", "DESCRIPTION"}) extensions[QLatin1String(k)] = true;
-    for (const char *k : {"TAGS", "RANGE", "CLIPMODE", "UNIT", "CRITICAL", "LISTEN", "PATH_CHANGED",
+    for (const char *k : {"ACCESS", "VALUE", "DESCRIPTION", "RANGE"}) extensions[QLatin1String(k)] = true;
+    for (const char *k : {"TAGS", "CLIPMODE", "UNIT", "CRITICAL", "LISTEN", "PATH_CHANGED",
                           "PATH_RENAMED", "PATH_ADDED", "PATH_REMOVED"}) extensions[QLatin1String(k)] = false;
     QJsonObject o;
     o["NAME"] = name;

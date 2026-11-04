@@ -17,6 +17,10 @@ struct EndpointDefinition {
     QString category;      // e.g. "M/E & Transitions", "Audio", "Camera PTZ"
     bool feedback;         // true if switcher sends status updates on this address
     QString currentValue;  // live value for GUI display
+    bool hasRange = false; // numeric range, exposed by OSCQuery so that controllers can draw a slider
+    double rangeMin = 0.0;
+    double rangeMax = 0.0;
+    QStringList choices;   // the accepted strings of an enumerated parameter
 };
 
 class AddressRegistry : public QAbstractTableModel {
@@ -43,6 +47,8 @@ public:
                           const QString &valueType, const QString &category, bool feedback);
     int rowForAddress(const QString &address);
     void updateLiveValue(const QString &pattern, const QString &value);
+    void setRange(const QString &pattern, double min, double max);
+    void setChoices(const QString &pattern, const QStringList &choices);
 
     const QVector<EndpointDefinition>& endpoints() const { return m_endpoints; }
     void initStandardEndpoints();

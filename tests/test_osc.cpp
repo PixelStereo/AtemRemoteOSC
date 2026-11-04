@@ -210,6 +210,48 @@ private slots:
         QCOMPARE(server.answer("OPTIONS", "/").status, 204);
     }
 
+    void testOscQueryRanges() {
+        Osc::AddressRegistry registry;
+        Osc::Dispatcher dispatcher(&registry);
+        RecordingBackend backend;
+        Osc::Client client;
+        dispatcher.addSwitcher("", &backend, &client);
+        Osc::QueryTree tree(&registry, &dispatcher);
+
+        auto range = [&](const QString &path) {
+            QJsonObject n;
+            [&] { QVERIFY(tree.node(path, n)); }();
+            return n["RANGE"].toArray().at(0).toObject();
+        };
+        QJsonObject r = range("/atem/clock/opacity");
+        QCOMPARE(r["MIN"].toDouble(), 0.0);
+        QCOMPARE(r["MAX"].toDouble(), 1.0);
+        r = range("/atem/audio/input/1/gain");
+        QCOMPARE(r["MIN"].toDouble(), -60.0);
+        QCOMPARE(r["MAX"].toDouble(), 6.0);
+        r = range("/atem/me/1/usk/1/chroma/hue");
+        QCOMPARE(r["MAX"].toDouble(), 360.0);
+        r = range("/atem/me/1/usk/1/mask/left");
+        QCOMPARE(r["MIN"].toDouble(), -16.0);
+        r = range("/atem/camera/1/ptz/pan");
+        QCOMPARE(r["MIN"].toDouble(), -1.0);
+        r = range("/atem/me/1/transition/type");
+        QCOMPARE(r["VALS"].toArray().size(), 5);
+        QVERIFY(r["VALS"].toArray().contains("wipe"));
+        QVERIFY(range("/atem/me/1/program").isEmpty()); // no known range: a plain number field
+
+        // A range only makes sense on a number, a list of choices only on a string
+        for (const auto &ep : registry.endpoints()) {
+            if (ep.hasRange) {
+                QVERIFY2(ep.valueType == "float" || ep.valueType == "int", qPrintable(ep.pattern));
+                QVERIFY2(ep.rangeMin < ep.rangeMax, qPrintable(ep.pattern));
+            }
+            if (!ep.choices.isEmpty()) QVERIFY2(ep.valueType == "string", qPrintable(ep.pattern));
+        }
+        QJsonObject info = tree.hostInfo("x", 1);
+        QVERIFY(info["EXTENSIONS"].toObject()["RANGE"].toBool());
+    }
+
     void testMdnsPackets() {
         const QByteArray name = Osc::MdnsResponder::encodeName("_oscjson._tcp.local");
         QCOMPARE(name.size(), 1 + 8 + 1 + 4 + 1 + 5 + 1);

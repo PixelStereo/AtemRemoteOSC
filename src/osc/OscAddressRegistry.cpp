@@ -109,6 +109,23 @@ int AddressRegistry::rowForAddress(const QString &address) {
     return found;
 }
 
+void AddressRegistry::setRange(const QString &pattern, double min, double max) {
+    auto it = m_patternIndex.constFind(pattern);
+    Q_ASSERT(it != m_patternIndex.constEnd());
+    if (it == m_patternIndex.constEnd()) return;
+    auto &ep = m_endpoints[it.value()];
+    ep.hasRange = true;
+    ep.rangeMin = min;
+    ep.rangeMax = max;
+}
+
+void AddressRegistry::setChoices(const QString &pattern, const QStringList &choices) {
+    auto it = m_patternIndex.constFind(pattern);
+    Q_ASSERT(it != m_patternIndex.constEnd());
+    if (it == m_patternIndex.constEnd()) return;
+    m_endpoints[it.value()].choices = choices;
+}
+
 void AddressRegistry::updateLiveValue(const QString &pattern, const QString &value) {
     const int row = rowForAddress(pattern);
     if (row >= 0) {
@@ -236,7 +253,7 @@ void AddressRegistry::initStandardEndpoints() {
     registerEndpoint("/clock/stop", "Stop countdown or stopwatch clock", "none", "Display Clock", true);
     registerEndpoint("/clock/reset", "Reset countdown or stopwatch clock", "none", "Display Clock", true);
     registerEndpoint("/clock/time", "Set target clock time in HH:MM:SS format", "string", "Display Clock", true);
-    registerEndpoint("/clock/size", "Set Clock display size scale (0.5 to 2.0)", "float", "Display Clock", true);
+    registerEndpoint("/clock/size", "Set Clock display size (0.0 to 1.0)", "float", "Display Clock", true);
     registerEndpoint("/clock/opacity", "Set Clock display opacity (0.0 to 1.0)", "float", "Display Clock", true);
 
     // Recording & Streaming
@@ -327,6 +344,45 @@ void AddressRegistry::initStandardEndpoints() {
     // Aux & Converted Video Mode
     registerEndpoint("/aux/<number>", "Set input source for Aux output <number>", "int", "Aux", true);
     registerEndpoint("/aux/<number>/converted-videomode", "Set converted video mode on Aux output (SDK 11.0)", "int", "Aux", true);
+
+    // Ranges and choices, from the original atemOSC documentation and the Blackmagic SDK
+    const QString usk = QStringLiteral("/me/<me>/usk/<key>/");
+    const QString dsk = QStringLiteral("/dsk/<key>/");
+    const QString in = QStringLiteral("/audio/input/<number>/");
+    const QString cam = QStringLiteral("/camera/<id>/");
+    for (const char *p : {"bar", "position"}) setRange(QStringLiteral("/me/<me>/transition/") + QLatin1String(p), 0.0, 1.0);
+    for (const char *p : {"rate", "mix/rate", "dip/rate", "wipe/rate", "dve/rate"}) setRange(QStringLiteral("/me/<me>/transition/") + QLatin1String(p), 1.0, 250.0);
+    setRange(dsk + QStringLiteral("rate"), 1.0, 250.0);
+    for (const char *p : {"luma/clip", "luma/gain", "chroma/gain", "chroma/y-suppress", "chroma/lift"}) setRange(usk + QLatin1String(p), 0.0, 1.0);
+    setRange(usk + QStringLiteral("chroma/hue"), 0.0, 360.0);
+    for (const QString &base : {usk + QStringLiteral("mask/"), dsk + QStringLiteral("mask/")}) {
+        setRange(base + QStringLiteral("top"), -9.0, 9.0);
+        setRange(base + QStringLiteral("bottom"), -9.0, 9.0);
+        setRange(base + QStringLiteral("left"), -16.0, 16.0);
+        setRange(base + QStringLiteral("right"), -16.0, 16.0);
+    }
+    setRange(dsk + QStringLiteral("clip"), 0.0, 1.0);
+    setRange(dsk + QStringLiteral("gain"), 0.0, 1.0);
+    setRange(in + QStringLiteral("gain"), -60.0, 6.0);
+    setRange(QStringLiteral("/audio/output/gain"), -60.0, 6.0);
+    setRange(in + QStringLiteral("balance"), -1.0, 1.0);
+    setRange(in + QStringLiteral("eq/<band>/gain"), -20.0, 20.0);
+    setRange(QStringLiteral("/clock/size"), 0.0, 1.0);
+    setRange(QStringLiteral("/clock/opacity"), 0.0, 1.0);
+    setRange(QStringLiteral("/clock/x"), -16.0, 16.0);
+    setRange(QStringLiteral("/clock/y"), -9.0, 9.0);
+    setRange(cam + QStringLiteral("iris"), 0.0, 1.0);
+    setRange(cam + QStringLiteral("focus"), 0.0, 1.0);
+    setRange(cam + QStringLiteral("white-balance"), 2500.0, 10000.0);
+    for (const char *p : {"pan", "tilt", "zoom"}) setRange(cam + QStringLiteral("ptz/") + QLatin1String(p), -1.0, 1.0);
+    setRange(QStringLiteral("/led/green"), 0.0, 1.0);
+    setRange(QStringLiteral("/led/red"), 0.0, 1.0);
+
+    setChoices(QStringLiteral("/me/<me>/transition/type"), {"mix", "dip", "wipe", "dve", "sting"});
+    setChoices(usk + QStringLiteral("type"), {"luma", "chroma", "pattern", "dve"});
+    setChoices(in + QStringLiteral("mix"), {"off", "on", "afv"});
+    setChoices(QStringLiteral("/clock/mode"), {"timeofday", "countdown", "countup"});
+    setChoices(QStringLiteral("/multiview/<mv>/layout"), {"top", "bottom", "left", "right"});
 }
 
 } // namespace Osc
