@@ -15,6 +15,7 @@ public:
 
 public slots:
     void appendLog(const QString &text);
+    void appendLogAt(const QDateTime &time, const QString &text);
     void clearLog();
 
 signals:

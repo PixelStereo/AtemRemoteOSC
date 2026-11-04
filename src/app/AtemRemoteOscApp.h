@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QObject>
+#include <QDateTime>
+#include <QPair>
 #include <QSettings>
 #include <QTimer>
 #include <QVector>
@@ -27,6 +29,7 @@ struct SwitcherInstance {
     Atem::IAtemBackend *backend = nullptr;
     Osc::Client *client = nullptr;
     QTimer *reconnectTimer = nullptr;
+    bool usingFallback = false;   // Auto mode: the SDK was unavailable, the direct network backend is used instead
     bool userDisconnected = true; // false once the user asked for a connection that should be kept alive
 };
 
@@ -55,6 +58,9 @@ public:
     Osc::Dispatcher* dispatcher() const { return m_dispatcher; }
     Osc::Server* oscServer() const { return m_oscServer; }
 
+    // Messages logged before the log console exists (start-up connection attempts)
+    const QVector<QPair<QDateTime, QString>>& logHistory() const { return m_logHistory; }
+
     bool logDebugOsc() const { return m_logDebugOsc; }
     void setLogDebugOsc(bool enable) { m_logDebugOsc = enable; }
 
@@ -66,9 +72,11 @@ signals:
 
 private:
     void wireBackend(SwitcherInstance *inst);
+    void replaceBackend(SwitcherInstance *inst, Atem::BackendType type);
 
     quint16 m_incomingPort = 3333;
     bool m_logDebugOsc = false;
+    QVector<QPair<QDateTime, QString>> m_logHistory;
     QSettings m_settings;
 
     Osc::Server *m_oscServer = nullptr;

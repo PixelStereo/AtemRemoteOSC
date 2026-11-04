@@ -21,6 +21,11 @@ AtemRemoteOscApp::~AtemRemoteOscApp() {
 }
 
 bool AtemRemoteOscApp::initialize() {
+    connect(this, &AtemRemoteOscApp::logMessage, this, [this](const QString &msg) {
+        m_logHistory.append({QDateTime::currentDateTime(), msg});
+        if (m_logHistory.size() > 500) m_logHistory.remove(0, m_logHistory.size() - 500);
+    });
+
     m_registry = new Osc::AddressRegistry(this);
     m_dispatcher = new Osc::Dispatcher(m_registry, this);
     m_oscServer = new Osc::Server(this);
@@ -96,11 +101,35 @@ SwitcherInstance* AtemRemoteOscApp::addSwitcher(const SwitcherConfig &config) {
     return inst;
 }
 
+void AtemRemoteOscApp::replaceBackend(SwitcherInstance *inst, Atem::BackendType type) {
+    inst->userDisconnected = true;
+    inst->reconnectTimer->stop();
+    inst->backend->disconnectFromSwitcher();
+    m_dispatcher->removeSwitcher(inst->backend);
+    inst->backend->deleteLater(); // may be called from one of its own signals
+    inst->backend = Atem::BackendFactory::createBackend(type, this);
+    wireBackend(inst);
+    m_dispatcher->addSwitcher(inst->config.nickname, inst->backend, inst->client, inst->config.invertTBar);
+}
+
 void AtemRemoteOscApp::wireBackend(SwitcherInstance *inst) {
     connect(inst->backend, &Atem::IAtemBackend::logMessage, this, &AtemRemoteOscApp::logMessage);
     connect(inst->backend, &Atem::IAtemBackend::connectionStateChanged, this, [this, inst](Atem::ConnectionState state) {
         int idx = m_switchers.indexOf(inst);
         if (idx >= 0) emit switcherUpdated(idx);
+
+        // Auto mode: when the vendor SDK cannot be loaded on this computer, use the direct network protocol
+        if (state == Atem::ConnectionState::Failed && !inst->usingFallback && !inst->userDisconnected
+            && inst->config.backendType == Atem::BackendType::Auto && inst->backend->sdkUnavailable()) {
+            inst->usingFallback = true;
+            emit logMessage(QStringLiteral("Blackmagic SDK unavailable: using the direct network protocol instead."));
+            replaceBackend(inst, Atem::BackendType::DirectNetwork);
+            QTimer::singleShot(0, this, [this, inst]() {
+                const int i = m_switchers.indexOf(inst);
+                if (i >= 0) connectSwitcher(i);
+            });
+            return;
+        }
 
         // Keep the link alive unless the user disconnected on purpose
         if (state == Atem::ConnectionState::Connected) {
@@ -139,13 +168,8 @@ void AtemRemoteOscApp::updateSwitcherConfig(int index, const SwitcherConfig &con
 
         if (backendTypeChanged) {
             const bool wasConnected = !inst->userDisconnected;
-            inst->userDisconnected = true;
-            inst->backend->disconnectFromSwitcher();
-            m_dispatcher->removeSwitcher(inst->backend);
-            inst->backend->deleteLater();
-            inst->backend = Atem::BackendFactory::createBackend(inst->config.backendType, this);
-            wireBackend(inst);
-            m_dispatcher->addSwitcher(inst->config.nickname, inst->backend, inst->client, inst->config.invertTBar);
+            inst->usingFallback = false;
+            replaceBackend(inst, inst->config.backendType);
             if (wasConnected) connectSwitcher(index);
         } else {
             m_dispatcher->setInvertTBar(inst->backend, config.invertTBar);

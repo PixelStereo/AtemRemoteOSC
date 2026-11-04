@@ -28,6 +28,7 @@ public:
     QString ipAddress() const override { return m_ip; }
 
     // Connection
+    bool sdkUnavailable() const override { return m_sdkUnavailable; }
     void connectTo(const QString &ip) override;
     void disconnectFromSwitcher() override;
 
@@ -177,6 +178,7 @@ public:
 
 private:
     void cleanup();
+    QString sdkDiagnostic() const;
     void queryCapabilities();
     void pollState(bool force);
 
@@ -220,6 +222,7 @@ private:
     QTimer *m_pollTimer = nullptr;
     int m_pollTick = 0;
     bool m_cameraFlushInit = false;
+    bool m_sdkUnavailable = false;
     QHash<QString, QVector<double>> m_snapshot;
 };
 

@@ -1,5 +1,6 @@
 #include "BmdSwitcherBackend.h"
 #include "BmdCallbackMonitors.h"
+#include <QFileInfo>
 #include <QMetaObject>
 #include <QDebug>
 
@@ -146,9 +147,23 @@ void BmdSwitcherBackend::cleanup() {
     m_meMap.clear();
 }
 
+// Explains why the vendor SDK cannot be used on this computer
+QString BmdSwitcherBackend::sdkDiagnostic() const {
+#if defined(__APPLE__)
+    const QString bundle = QStringLiteral("/Library/Application Support/Blackmagic Design/Switchers/BMDSwitcherAPI.bundle");
+    if (!QFileInfo::exists(bundle)) {
+        return QStringLiteral("%1 not found: install ATEM Software Control (it provides the Blackmagic switcher library).").arg(bundle);
+    }
+    return QStringLiteral("the installed Blackmagic switcher library is older than SDK 11.0 (or cannot be loaded): update ATEM Software Control to the latest version.");
+#else
+    return QStringLiteral("the Blackmagic ATEM switcher library is not registered: install ATEM Software Control / ATEM Switchers software.");
+#endif
+}
+
 void BmdSwitcherBackend::connectTo(const QString &ip) {
     disconnectFromSwitcher();
     m_ip = ip;
+    m_sdkUnavailable = false;
     m_connectionState = Atem::ConnectionState::Connecting;
     emit connectionStateChanged(m_connectionState);
     emit logMessage(QStringLiteral("Connecting to ATEM switcher at %1 (SDK 11.0)...").arg(ip));
@@ -156,9 +171,10 @@ void BmdSwitcherBackend::connectTo(const QString &ip) {
 #if defined(__APPLE__)
     m_discovery = CreateBMDSwitcherDiscoveryInstance();
     if (!m_discovery) {
+        m_sdkUnavailable = true;
         m_connectionState = Atem::ConnectionState::Failed;
+        emit logMessage(QStringLiteral("Failed to create BMDSwitcherDiscovery instance: %1").arg(sdkDiagnostic()));
         emit connectionStateChanged(m_connectionState);
-        emit logMessage(QStringLiteral("Failed to create BMDSwitcherDiscovery instance."));
         return;
     }
 
@@ -170,9 +186,10 @@ void BmdSwitcherBackend::connectTo(const QString &ip) {
     CoInitialize(NULL);
     HRESULT hr = CoCreateInstance(CLSID_CBMDSwitcherDiscovery, NULL, CLSCTX_ALL, IID_IBMDSwitcherDiscovery, (void**)&m_discovery);
     if (FAILED(hr) || !m_discovery) {
+        m_sdkUnavailable = true;
         m_connectionState = Atem::ConnectionState::Failed;
+        emit logMessage(QStringLiteral("Failed to create BMDSwitcherDiscovery instance (COM CoCreateInstance): %1").arg(sdkDiagnostic()));
         emit connectionStateChanged(m_connectionState);
-        emit logMessage(QStringLiteral("Failed to create BMDSwitcherDiscovery instance (COM CoCreateInstance)."));
         return;
     }
 

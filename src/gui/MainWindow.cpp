@@ -15,6 +15,9 @@ MainWindow::MainWindow(AtemRemoteOscApp *app, QWidget *parent)
     QSettings settings("AtemRemoteOsc", "AtemRemoteOsc");
     restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
 
+    for (const auto &entry : m_app->logHistory()) {
+        m_logConsole->appendLogAt(entry.first, entry.second);
+    }
     connect(m_app, &AtemRemoteOscApp::logMessage, m_logConsole, &LogConsoleWidget::appendLog);
     connect(m_app, &AtemRemoteOscApp::oscServerStateChanged, this, &MainWindow::onOscServerStateChanged);
 

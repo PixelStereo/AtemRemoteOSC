@@ -44,8 +44,11 @@ void LogConsoleWidget::setLogDebugOsc(bool enable) {
 }
 
 void LogConsoleWidget::appendLog(const QString &text) {
-    QString timeStr = QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss.zzz"));
-    m_console->appendPlainText(QStringLiteral("[%1] %2").arg(timeStr, text));
+    appendLogAt(QDateTime::currentDateTime(), text);
+}
+
+void LogConsoleWidget::appendLogAt(const QDateTime &time, const QString &text) {
+    m_console->appendPlainText(QStringLiteral("[%1] %2").arg(time.toString(QStringLiteral("hh:mm:ss.zzz")), text));
 }
 
 void LogConsoleWidget::clearLog() {
