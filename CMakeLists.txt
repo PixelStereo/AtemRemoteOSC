@@ -54,8 +54,9 @@ if(APPLE)
         src/backend/bmd/BmdCallbackMonitors.h
         src/backend/bmd/BmdCallbackMonitors.cpp
         "${BMD_SDK_DIR}/Mac OS X/include/BMDSwitcherAPIDispatch.cpp"
+        "${BMD_SDK_DIR}/Mac OS X/include/Legacy/BMDSwitcherAPIDispatch_v10_2_1.cpp"
     )
-    include_directories("${BMD_SDK_DIR}/Mac OS X/include")
+    include_directories("${BMD_SDK_DIR}/Mac OS X/include" "${BMD_SDK_DIR}/Mac OS X/include/Legacy")
 elseif(WIN32)
     # The Windows SDK ships an IDL file: generate the COM headers and IID definitions with MIDL
     set(BMD_GEN_DIR "${CMAKE_CURRENT_BINARY_DIR}/bmd_gen")

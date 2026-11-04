@@ -3,6 +3,9 @@
 #if defined(__APPLE__)
     #include <CoreFoundation/CoreFoundation.h>
     #include "BMDSwitcherAPI.h"
+    // Older generation of the switcher library (ATEM Software Control 10.2 to 10.4), see BmdSwitcherBackend
+    #include "Legacy/BMDSwitcherAPI_v10_2_1.h"
+    #include "Legacy/BMDSwitcherAPI_v10_4_1.h"
 #elif defined(_WIN32)
     #include <windows.h>
     #include <objbase.h>

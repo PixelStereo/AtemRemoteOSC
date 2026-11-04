@@ -44,7 +44,13 @@ The OSC address scheme of 4.2 is **kept**, so existing TouchOSC / Open Stage Con
 
 ## Requirements
 
-AtemRemoteOsc talks to the switcher through the official Blackmagic SDK, which relies on a library installed by **ATEM Software Control**. Install the latest version of ATEM Software Control on the computer that runs AtemRemoteOsc (the same version as the switcher firmware, or newer). If it is missing or too old, the log says so and the connection fails. There is no Linux support, since the SDK does not exist there; the code still builds on Linux for development and tests.
+AtemRemoteOsc talks to the switcher through the official Blackmagic SDK, which relies on a library installed by **ATEM Software Control**. Install ATEM Software Control on the computer that runs AtemRemoteOsc, preferably the latest version (11.x, which matches the SDK used here).
+
+ - **ATEM Software Control 10.2 to 10.4** works too, in a compatibility mode (macOS only): everything is available except streaming.
+ - **Older versions** are not supported: the log says so, and the connection fails. Update ATEM Software Control.
+ - Connecting can take several seconds: AtemRemoteOsc tries up to 5 times, 2 seconds apart, like the original application.
+
+There is no Linux support, since the SDK does not exist there; the code still builds on Linux for development and tests.
 
 ## Current limitations
 

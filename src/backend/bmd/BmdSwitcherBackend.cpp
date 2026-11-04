@@ -1,6 +1,8 @@
 #include "BmdSwitcherBackend.h"
 #include "BmdCallbackMonitors.h"
 #include <QFileInfo>
+#include <QThread>
+#include <cstring>
 #include <QMetaObject>
 #include <QDebug>
 
@@ -44,7 +46,7 @@ void BmdSwitcherBackend::cleanup() {
     for (size_t i = 0; i < m_meMonitors.size(); ++i) {
         if (!m_meMonitors[i]) continue;
         m_meMonitors[i]->detach();
-        if (i < m_meBlocks.size() && m_meBlocks[i]) m_meBlocks[i]->RemoveCallback(m_meMonitors[i]);
+        if (i < m_meBlocks.size() && m_meBlocks[i]) meRemoveCallback(m_meBlocks[i], m_meMonitors[i]);
         m_meMonitors[i]->Release();
     }
     m_meMonitors.clear();
@@ -80,7 +82,7 @@ void BmdSwitcherBackend::cleanup() {
     for (size_t i = 0; i < m_mvMonitors.size(); ++i) {
         if (!m_mvMonitors[i]) continue;
         m_mvMonitors[i]->detach();
-        if (i < m_multiviews.size() && m_multiviews[i]) m_multiviews[i]->RemoveCallback(m_mvMonitors[i]);
+        if (i < m_multiviews.size() && m_multiviews[i]) multiViewRemoveCallback(m_multiviews[i], m_mvMonitors[i]);
         m_mvMonitors[i]->Release();
     }
     m_mvMonitors.clear();
@@ -128,7 +130,7 @@ void BmdSwitcherBackend::cleanup() {
 
     if (m_switcherMonitor) {
         m_switcherMonitor->detach();
-        if (m_switcher) m_switcher->RemoveCallback(m_switcherMonitor);
+        if (m_switcher) switcherRemoveCallback(m_switcherMonitor);
         m_switcherMonitor->Release();
         m_switcherMonitor = nullptr;
     }
@@ -160,17 +162,100 @@ QString BmdSwitcherBackend::sdkDiagnostic() const {
 #endif
 }
 
+static bool sameIid(REFIID a, REFIID b) {
+#if defined(_WIN32)
+    return IsEqualIID(a, b);
+#else
+    return std::memcmp(&a, &b, sizeof(REFIID)) == 0;
+#endif
+}
+
+// One attempt: the library lookup and ConnectTo, which can block for several seconds
+static BmdConnectAttempt runConnectAttempt(const QString &ip) {
+    BmdConnectAttempt r;
+#if defined(__APPLE__)
+    CFStringRef cfIp = ip.toCFString();
+    if (IBMDSwitcherDiscovery *discovery = CreateBMDSwitcherDiscoveryInstance()) {
+        r.discovery = discovery;
+        r.hr = discovery->ConnectTo(cfIp, &r.switcher, &r.failure);
+    } else if (IBMDSwitcherDiscovery_v10_2_1 *legacy = CreateBMDSwitcherDiscoveryInstance_v10_2_1()) {
+        // ATEM Software Control 10.2 - 10.4: older library generation
+        IBMDSwitcher_v10_2_1 *legacySwitcher = nullptr;
+        r.legacy = true;
+        r.discovery = reinterpret_cast<IBMDSwitcherDiscovery*>(legacy);
+        r.hr = legacy->ConnectTo(cfIp, &legacySwitcher, &r.failure);
+        r.switcher = reinterpret_cast<IBMDSwitcher*>(legacySwitcher);
+    } else {
+        r.sdkMissing = true;
+    }
+    CFRelease(cfIp);
+#elif defined(_WIN32)
+    CoInitialize(NULL);
+    HRESULT hrCreate = CoCreateInstance(CLSID_CBMDSwitcherDiscovery, NULL, CLSCTX_ALL, IID_IBMDSwitcherDiscovery, (void**)&r.discovery);
+    if (FAILED(hrCreate) || !r.discovery) {
+        r.discovery = nullptr;
+        r.sdkMissing = true;
+    } else {
+        BSTR bstrIp = SysAllocString((const OLECHAR*)ip.utf16());
+        r.hr = r.discovery->ConnectTo(bstrIp, &r.switcher, &r.failure);
+        SysFreeString(bstrIp);
+    }
+#endif
+    return r;
+}
+
+static void releaseAttempt(BmdConnectAttempt &r) {
+    if (r.switcher) { r.switcher->Release(); r.switcher = nullptr; }
+    if (r.discovery) { r.discovery->Release(); r.discovery = nullptr; }
+}
+
 void BmdSwitcherBackend::connectTo(const QString &ip) {
     disconnectFromSwitcher();
+    ++m_generation;
     m_ip = ip;
     m_sdkUnavailable = false;
+    m_legacy = false;
+    m_attemptsRemaining = 5; // like the original application: the switcher drops its session after ~2 s
     m_connectionState = Atem::ConnectionState::Connecting;
     emit connectionStateChanged(m_connectionState);
-    emit logMessage(QStringLiteral("Connecting to ATEM switcher at %1 (SDK 11.0)...").arg(ip));
+    emit logMessage(QStringLiteral("Connecting to ATEM switcher at %1...").arg(ip));
+    startConnectAttempt();
+}
 
+void BmdSwitcherBackend::startConnectAttempt() {
+    const int generation = m_generation;
+    const QString ip = m_ip;
 #if defined(__APPLE__)
-    m_discovery = CreateBMDSwitcherDiscoveryInstance();
-    if (!m_discovery) {
+    // ConnectTo() blocks: keep it off the GUI thread. The objects it returns are used afterwards on the GUI thread.
+    QPointer<BmdSwitcherBackend> self(this);
+    QThread *thread = QThread::create([self, generation, ip]() {
+        BmdConnectAttempt result = runConnectAttempt(ip);
+        if (!self) {
+            releaseAttempt(result);
+            return;
+        }
+        QMetaObject::invokeMethod(self.data(), [self, generation, result]() mutable {
+            if (self) self->onConnectAttemptDone(generation, result);
+            else releaseAttempt(result);
+        }, Qt::QueuedConnection);
+    });
+    connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+    thread->start();
+#else
+    // COM objects stay on the thread that created them
+    QMetaObject::invokeMethod(this, [this, generation, ip]() {
+        onConnectAttemptDone(generation, runConnectAttempt(ip));
+    }, Qt::QueuedConnection);
+#endif
+}
+
+void BmdSwitcherBackend::onConnectAttemptDone(int generation, BmdConnectAttempt result) {
+    if (generation != m_generation || m_connectionState != Atem::ConnectionState::Connecting) {
+        releaseAttempt(result); // disconnected or reconnected to another address meanwhile
+        return;
+    }
+
+    if (result.sdkMissing) {
         m_sdkUnavailable = true;
         m_connectionState = Atem::ConnectionState::Failed;
         emit logMessage(QStringLiteral("Failed to create BMDSwitcherDiscovery instance: %1").arg(sdkDiagnostic()));
@@ -178,45 +263,51 @@ void BmdSwitcherBackend::connectTo(const QString &ip) {
         return;
     }
 
-    CFStringRef cfIp = ip.toCFString();
-    BMDSwitcherConnectToFailure failureReason;
-    HRESULT hr = m_discovery->ConnectTo(cfIp, &m_switcher, &failureReason);
-    CFRelease(cfIp);
-#elif defined(_WIN32)
-    CoInitialize(NULL);
-    HRESULT hr = CoCreateInstance(CLSID_CBMDSwitcherDiscovery, NULL, CLSCTX_ALL, IID_IBMDSwitcherDiscovery, (void**)&m_discovery);
-    if (FAILED(hr) || !m_discovery) {
-        m_sdkUnavailable = true;
+    if (FAILED(result.hr) || !result.switcher) {
+        releaseAttempt(result);
+        QString reason = QStringLiteral("Connection failed for unknown reason");
+        bool retry = true;
+        switch (result.failure) {
+            case bmdSwitcherConnectToFailureNoResponse: reason = QStringLiteral("No response from switcher"); break;
+            case bmdSwitcherConnectToFailureIncompatibleFirmware:
+                reason = QStringLiteral("Switcher has incompatible firmware (update ATEM Software Control, or the switcher firmware)");
+                retry = false;
+                break;
+            case bmdSwitcherConnectToFailureCorruptData: reason = QStringLiteral("Corrupt data was received during connection attempt"); break;
+            case bmdSwitcherConnectToFailureStateSync: reason = QStringLiteral("State synchronisation failed during connection attempt"); break;
+            case bmdSwitcherConnectToFailureStateSyncTimedOut: reason = QStringLiteral("State synchronisation timed out during connection attempt"); break;
+            default: break;
+        }
+        const QString code = QStringLiteral("HRESULT 0x%1").arg(static_cast<quint32>(result.hr), 8, 16, QChar('0'));
+
+        if (retry && m_attemptsRemaining > 1) {
+            --m_attemptsRemaining;
+            emit logMessage(QStringLiteral("%1 (%2), retrying %3 more times").arg(reason, code).arg(m_attemptsRemaining));
+            QTimer::singleShot(2000, this, [this, generation]() {
+                if (generation == m_generation && m_connectionState == Atem::ConnectionState::Connecting) startConnectAttempt();
+            });
+            return;
+        }
         m_connectionState = Atem::ConnectionState::Failed;
-        emit logMessage(QStringLiteral("Failed to create BMDSwitcherDiscovery instance (COM CoCreateInstance): %1").arg(sdkDiagnostic()));
+        emit logMessage(retry ? QStringLiteral("Failed to connect after 5 attempts: %1 (%2)").arg(reason, code)
+                              : QStringLiteral("%1 (%2)").arg(reason, code));
         emit connectionStateChanged(m_connectionState);
         return;
     }
 
-    BSTR bstrIp = SysAllocString((const OLECHAR*)ip.utf16());
-    BMDSwitcherConnectToFailure failureReason;
-    hr = m_discovery->ConnectTo(bstrIp, &m_switcher, &failureReason);
-    SysFreeString(bstrIp);
-#endif
+    m_discovery = result.discovery;
+    m_switcher = result.switcher;
+    m_legacy = result.legacy;
+    finishConnection();
+}
 
-    if (FAILED(hr) || !m_switcher) {
-        m_connectionState = Atem::ConnectionState::Failed;
-        emit connectionStateChanged(m_connectionState);
-        QString reasonStr = QStringLiteral("Unknown error");
-        switch (failureReason) {
-            case bmdSwitcherConnectToFailureNoResponse: reasonStr = QStringLiteral("No response from switcher"); break;
-            case bmdSwitcherConnectToFailureIncompatibleFirmware: reasonStr = QStringLiteral("Incompatible firmware version"); break;
-            case bmdSwitcherConnectToFailureCorruptData: reasonStr = QStringLiteral("Corrupt data received"); break;
-            case bmdSwitcherConnectToFailureStateSyncTimedOut: reasonStr = QStringLiteral("State synchronization timed out"); break;
-            default: break;
-        }
-        emit logMessage(QStringLiteral("Connection failed: %1 (HRESULT: 0x%2)").arg(reasonStr).arg(hr, 8, 16, QChar('0')));
-        cleanup();
-        return;
+void BmdSwitcherBackend::finishConnection() {
+    if (m_legacy) {
+        emit logMessage(QStringLiteral("Using the older switcher library of ATEM Software Control 10.x: streaming is not available, update ATEM Software Control for all features."));
     }
 
     m_switcherMonitor = new SwitcherMonitor(this);
-    m_switcher->AddCallback(m_switcherMonitor);
+    switcherAddCallback(m_switcherMonitor);
 
 #if defined(__APPLE__)
     CFStringRef cfName = NULL;
@@ -248,7 +339,74 @@ void BmdSwitcherBackend::connectTo(const QString &ip) {
     m_pollTimer->start();
 }
 
+// ---- compatibility with the older library generation ----
+
+HRESULT BmdSwitcherBackend::switcherCreateIterator(REFIID iid, LPVOID *ppv) {
+#if defined(__APPLE__)
+    if (m_legacy) {
+        // Iterators of the interfaces that changed since have their own identifiers
+        const CFUUIDBytes &legacyIid =
+            sameIid(iid, IID_IBMDSwitcherMixEffectBlockIterator) ? IID_IBMDSwitcherMixEffectBlockIterator_v10_2_1
+          : sameIid(iid, IID_IBMDSwitcherInputIterator)          ? IID_IBMDSwitcherInputIterator_v10_4_1
+          : sameIid(iid, IID_IBMDSwitcherMultiViewIterator)      ? IID_IBMDSwitcherMultiViewIterator_v10_4_1
+          : iid;
+        return reinterpret_cast<IBMDSwitcher_v10_2_1*>(m_switcher)->CreateIterator(legacyIid, ppv);
+    }
+#endif
+    return m_switcher->CreateIterator(iid, ppv);
+}
+
+HRESULT BmdSwitcherBackend::switcherAddCallback(IBMDSwitcherCallback *cb) {
+#if defined(__APPLE__)
+    if (m_legacy) return reinterpret_cast<IBMDSwitcher_v10_2_1*>(m_switcher)->AddCallback(cb);
+#endif
+    return m_switcher->AddCallback(cb);
+}
+
+HRESULT BmdSwitcherBackend::switcherRemoveCallback(IBMDSwitcherCallback *cb) {
+#if defined(__APPLE__)
+    if (m_legacy) return reinterpret_cast<IBMDSwitcher_v10_2_1*>(m_switcher)->RemoveCallback(cb);
+#endif
+    return m_switcher->RemoveCallback(cb);
+}
+
+HRESULT BmdSwitcherBackend::meCreateKeyIterator(IBMDSwitcherMixEffectBlock *me, LPVOID *ppv) {
+#if defined(__APPLE__)
+    if (m_legacy) return reinterpret_cast<IBMDSwitcherMixEffectBlock_v10_2_1*>(me)->CreateIterator(IID_IBMDSwitcherKeyIterator, ppv);
+#endif
+    return me->CreateIterator(IID_IBMDSwitcherKeyIterator, ppv);
+}
+
+HRESULT BmdSwitcherBackend::meAddCallback(IBMDSwitcherMixEffectBlock *me, IBMDSwitcherMixEffectBlockCallback *cb) {
+#if defined(__APPLE__)
+    if (m_legacy) return reinterpret_cast<IBMDSwitcherMixEffectBlock_v10_2_1*>(me)->AddCallback(cb);
+#endif
+    return me->AddCallback(cb);
+}
+
+HRESULT BmdSwitcherBackend::meRemoveCallback(IBMDSwitcherMixEffectBlock *me, IBMDSwitcherMixEffectBlockCallback *cb) {
+#if defined(__APPLE__)
+    if (m_legacy) return reinterpret_cast<IBMDSwitcherMixEffectBlock_v10_2_1*>(me)->RemoveCallback(cb);
+#endif
+    return me->RemoveCallback(cb);
+}
+
+HRESULT BmdSwitcherBackend::multiViewAddCallback(IBMDSwitcherMultiView *mv, IBMDSwitcherMultiViewCallback *cb) {
+#if defined(__APPLE__)
+    if (m_legacy) return reinterpret_cast<IBMDSwitcherMultiView_v10_4_1*>(mv)->AddCallback(cb);
+#endif
+    return mv->AddCallback(cb);
+}
+
+HRESULT BmdSwitcherBackend::multiViewRemoveCallback(IBMDSwitcherMultiView *mv, IBMDSwitcherMultiViewCallback *cb) {
+#if defined(__APPLE__)
+    if (m_legacy) return reinterpret_cast<IBMDSwitcherMultiView_v10_4_1*>(mv)->RemoveCallback(cb);
+#endif
+    return mv->RemoveCallback(cb);
+}
+
 void BmdSwitcherBackend::disconnectFromSwitcher() {
+    ++m_generation; // drops the result of any attempt still running
     if (m_connectionState != Atem::ConnectionState::Disconnected) {
         cleanup();
         m_connectionState = Atem::ConnectionState::Disconnected;
@@ -262,13 +420,13 @@ void BmdSwitcherBackend::queryCapabilities() {
 
     // 1. ME blocks
     IBMDSwitcherMixEffectBlockIterator *meIt = nullptr;
-    if (SUCCEEDED(m_switcher->CreateIterator(IID_IBMDSwitcherMixEffectBlockIterator, (void**)&meIt)) && meIt) {
+    if (SUCCEEDED(switcherCreateIterator(IID_IBMDSwitcherMixEffectBlockIterator, (void**)&meIt)) && meIt) {
         IBMDSwitcherMixEffectBlock *me = nullptr;
         int meIdx = 1;
         while (meIt->Next(&me) == S_OK && me) {
             m_meBlocks.push_back(me);
             MixEffectBlockMonitor *mon = new MixEffectBlockMonitor(this, meIdx);
-            me->AddCallback(mon);
+            meAddCallback(me, mon);
             m_meMonitors.push_back(mon);
             meIdx++;
         }
@@ -277,7 +435,7 @@ void BmdSwitcherBackend::queryCapabilities() {
 
     // 2. Inputs
     IBMDSwitcherInputIterator *inputIt = nullptr;
-    if (SUCCEEDED(m_switcher->CreateIterator(IID_IBMDSwitcherInputIterator, (void**)&inputIt)) && inputIt) {
+    if (SUCCEEDED(switcherCreateIterator(IID_IBMDSwitcherInputIterator, (void**)&inputIt)) && inputIt) {
         IBMDSwitcherInput *input = nullptr;
         while (inputIt->Next(&input) == S_OK && input) {
             BMDSwitcherInputId id;
@@ -329,7 +487,7 @@ void BmdSwitcherBackend::queryCapabilities() {
 
     // 3. Downstream Keyers
     IBMDSwitcherDownstreamKeyIterator *dskIt = nullptr;
-    if (SUCCEEDED(m_switcher->CreateIterator(IID_IBMDSwitcherDownstreamKeyIterator, (void**)&dskIt)) && dskIt) {
+    if (SUCCEEDED(switcherCreateIterator(IID_IBMDSwitcherDownstreamKeyIterator, (void**)&dskIt)) && dskIt) {
         IBMDSwitcherDownstreamKey *dsk = nullptr;
         int dskIdx = 1;
         while (dskIt->Next(&dsk) == S_OK && dsk) {
@@ -351,7 +509,7 @@ void BmdSwitcherBackend::queryCapabilities() {
         m_recordMonitor = new RecordMonitor(this);
         m_record->AddCallback(m_recordMonitor);
     }
-    if (SUCCEEDED(m_switcher->QueryInterface(IID_IBMDSwitcherStreamRTMP, (void**)&m_stream)) && m_stream) {
+    if (!m_legacy && SUCCEEDED(m_switcher->QueryInterface(IID_IBMDSwitcherStreamRTMP, (void**)&m_stream)) && m_stream) {
         m_streamMonitor = new StreamMonitor(this);
         m_stream->AddCallback(m_streamMonitor);
     }
@@ -364,13 +522,13 @@ void BmdSwitcherBackend::queryCapabilities() {
 
     // 7. MultiViews
     IBMDSwitcherMultiViewIterator *mvIt = nullptr;
-    if (SUCCEEDED(m_switcher->CreateIterator(IID_IBMDSwitcherMultiViewIterator, (void**)&mvIt)) && mvIt) {
+    if (SUCCEEDED(switcherCreateIterator(IID_IBMDSwitcherMultiViewIterator, (void**)&mvIt)) && mvIt) {
         IBMDSwitcherMultiView *mv = nullptr;
         int mvIdx = 1;
         while (mvIt->Next(&mv) == S_OK && mv) {
             m_multiviews.push_back(mv);
             MultiViewMonitor *mon = new MultiViewMonitor(this, mvIdx);
-            mv->AddCallback(mon);
+            multiViewAddCallback(mv, mon);
             m_mvMonitors.push_back(mon);
             mvIdx++;
         }
@@ -638,7 +796,7 @@ void BmdSwitcherBackend::pollState(bool force) {
         }
 
         IBMDSwitcherKeyIterator *kIt = nullptr;
-        if (FAILED(m_meBlocks[m]->CreateIterator(IID_IBMDSwitcherKeyIterator, (void**)&kIt)) || !kIt) continue;
+        if (FAILED(meCreateKeyIterator(m_meBlocks[m], (void**)&kIt)) || !kIt) continue;
         IBMDSwitcherKey *key = nullptr;
         int keyIdx = 1;
         while (kIt->Next(&key) == S_OK && key) {
@@ -827,7 +985,7 @@ void BmdSwitcherBackend::pollState(bool force) {
 
     // Input names
     IBMDSwitcherInputIterator *inputIt = nullptr;
-    if (SUCCEEDED(m_switcher->CreateIterator(IID_IBMDSwitcherInputIterator, (void**)&inputIt)) && inputIt) {
+    if (SUCCEEDED(switcherCreateIterator(IID_IBMDSwitcherInputIterator, (void**)&inputIt)) && inputIt) {
         IBMDSwitcherInput *input = nullptr;
         while (inputIt->Next(&input) == S_OK && input) {
             BMDSwitcherInputId id = 0;
@@ -967,7 +1125,7 @@ void BmdSwitcherBackend::setPreviewTransition(int me, bool preview) {
 void BmdSwitcherBackend::setUskOnAir(int me, int keyer, bool onAir) {
     if (me <= 0 || me > static_cast<int>(m_meBlocks.size())) return;
     IBMDSwitcherKeyIterator *kIt = nullptr;
-    if (SUCCEEDED(m_meBlocks[me - 1]->CreateIterator(IID_IBMDSwitcherKeyIterator, (void**)&kIt)) && kIt) {
+    if (SUCCEEDED(meCreateKeyIterator(m_meBlocks[me - 1], (void**)&kIt)) && kIt) {
         IBMDSwitcherKey *k = nullptr;
         int idx = 1;
         while (kIt->Next(&k) == S_OK && k) {
@@ -1001,7 +1159,7 @@ void BmdSwitcherBackend::setUskTie(int me, int keyer, bool tie) {
 void BmdSwitcherBackend::setUskType(int me, int keyer, Atem::KeyType type) {
     if (me <= 0 || me > static_cast<int>(m_meBlocks.size())) return;
     IBMDSwitcherKeyIterator *kIt = nullptr;
-    if (SUCCEEDED(m_meBlocks[me - 1]->CreateIterator(IID_IBMDSwitcherKeyIterator, (void**)&kIt)) && kIt) {
+    if (SUCCEEDED(meCreateKeyIterator(m_meBlocks[me - 1], (void**)&kIt)) && kIt) {
         IBMDSwitcherKey *k = nullptr;
         int idx = 1;
         while (kIt->Next(&k) == S_OK && k) {
@@ -1027,7 +1185,7 @@ void BmdSwitcherBackend::setUskType(int me, int keyer, Atem::KeyType type) {
 void BmdSwitcherBackend::setUskFillSource(int me, int keyer, int64_t inputId) {
     if (me <= 0 || me > static_cast<int>(m_meBlocks.size())) return;
     IBMDSwitcherKeyIterator *kIt = nullptr;
-    if (SUCCEEDED(m_meBlocks[me - 1]->CreateIterator(IID_IBMDSwitcherKeyIterator, (void**)&kIt)) && kIt) {
+    if (SUCCEEDED(meCreateKeyIterator(m_meBlocks[me - 1], (void**)&kIt)) && kIt) {
         IBMDSwitcherKey *k = nullptr;
         int idx = 1;
         while (kIt->Next(&k) == S_OK && k) {
@@ -1046,7 +1204,7 @@ void BmdSwitcherBackend::setUskFillSource(int me, int keyer, int64_t inputId) {
 void BmdSwitcherBackend::setUskCutSource(int me, int keyer, int64_t inputId) {
     if (me <= 0 || me > static_cast<int>(m_meBlocks.size())) return;
     IBMDSwitcherKeyIterator *kIt = nullptr;
-    if (SUCCEEDED(m_meBlocks[me - 1]->CreateIterator(IID_IBMDSwitcherKeyIterator, (void**)&kIt)) && kIt) {
+    if (SUCCEEDED(meCreateKeyIterator(m_meBlocks[me - 1], (void**)&kIt)) && kIt) {
         IBMDSwitcherKey *k = nullptr;
         int idx = 1;
         while (kIt->Next(&k) == S_OK && k) {
@@ -1065,7 +1223,7 @@ void BmdSwitcherBackend::setUskCutSource(int me, int keyer, int64_t inputId) {
 void BmdSwitcherBackend::setUskLumaParams(int me, int keyer, bool preMult, float clip, float gain, bool inverse) {
     if (me <= 0 || me > static_cast<int>(m_meBlocks.size())) return;
     IBMDSwitcherKeyIterator *kIt = nullptr;
-    if (SUCCEEDED(m_meBlocks[me - 1]->CreateIterator(IID_IBMDSwitcherKeyIterator, (void**)&kIt)) && kIt) {
+    if (SUCCEEDED(meCreateKeyIterator(m_meBlocks[me - 1], (void**)&kIt)) && kIt) {
         IBMDSwitcherKey *k = nullptr;
         int idx = 1;
         while (kIt->Next(&k) == S_OK && k) {
@@ -1091,7 +1249,7 @@ void BmdSwitcherBackend::setUskLumaParams(int me, int keyer, bool preMult, float
 void BmdSwitcherBackend::setUskChromaParams(int me, int keyer, float hue, float gain, float ySuppress, float lift, bool narrow) {
     if (me <= 0 || me > static_cast<int>(m_meBlocks.size())) return;
     IBMDSwitcherKeyIterator *kIt = nullptr;
-    if (SUCCEEDED(m_meBlocks[me - 1]->CreateIterator(IID_IBMDSwitcherKeyIterator, (void**)&kIt)) && kIt) {
+    if (SUCCEEDED(meCreateKeyIterator(m_meBlocks[me - 1], (void**)&kIt)) && kIt) {
         IBMDSwitcherKey *k = nullptr;
         int idx = 1;
         while (kIt->Next(&k) == S_OK && k) {
@@ -1118,7 +1276,7 @@ void BmdSwitcherBackend::setUskChromaParams(int me, int keyer, float hue, float 
 void BmdSwitcherBackend::setUskAdvancedChromaSample(int me, int keyer, float x, float y) {
     if (me <= 0 || me > static_cast<int>(m_meBlocks.size())) return;
     IBMDSwitcherKeyIterator *kIt = nullptr;
-    if (SUCCEEDED(m_meBlocks[me - 1]->CreateIterator(IID_IBMDSwitcherKeyIterator, (void**)&kIt)) && kIt) {
+    if (SUCCEEDED(meCreateKeyIterator(m_meBlocks[me - 1], (void**)&kIt)) && kIt) {
         IBMDSwitcherKey *k = nullptr;
         int idx = 1;
         while (kIt->Next(&k) == S_OK && k) {
@@ -1142,7 +1300,7 @@ void BmdSwitcherBackend::setUskAdvancedChromaSample(int me, int keyer, float x, 
 void BmdSwitcherBackend::setUskFlyEnabled(int me, int keyer, bool enabled) {
     if (me <= 0 || me > static_cast<int>(m_meBlocks.size())) return;
     IBMDSwitcherKeyIterator *kIt = nullptr;
-    if (SUCCEEDED(m_meBlocks[me - 1]->CreateIterator(IID_IBMDSwitcherKeyIterator, (void**)&kIt)) && kIt) {
+    if (SUCCEEDED(meCreateKeyIterator(m_meBlocks[me - 1], (void**)&kIt)) && kIt) {
         IBMDSwitcherKey *k = nullptr;
         int idx = 1;
         while (kIt->Next(&k) == S_OK && k) {
@@ -1165,7 +1323,7 @@ void BmdSwitcherBackend::setUskFlyEnabled(int me, int keyer, bool enabled) {
 void BmdSwitcherBackend::setUskFlyPosition(int me, int keyer, float x, float y) {
     if (me <= 0 || me > static_cast<int>(m_meBlocks.size())) return;
     IBMDSwitcherKeyIterator *kIt = nullptr;
-    if (SUCCEEDED(m_meBlocks[me - 1]->CreateIterator(IID_IBMDSwitcherKeyIterator, (void**)&kIt)) && kIt) {
+    if (SUCCEEDED(meCreateKeyIterator(m_meBlocks[me - 1], (void**)&kIt)) && kIt) {
         IBMDSwitcherKey *k = nullptr;
         int idx = 1;
         while (kIt->Next(&k) == S_OK && k) {
@@ -1189,7 +1347,7 @@ void BmdSwitcherBackend::setUskFlyPosition(int me, int keyer, float x, float y) 
 void BmdSwitcherBackend::setUskFlySize(int me, int keyer, float sizeX, float sizeY) {
     if (me <= 0 || me > static_cast<int>(m_meBlocks.size())) return;
     IBMDSwitcherKeyIterator *kIt = nullptr;
-    if (SUCCEEDED(m_meBlocks[me - 1]->CreateIterator(IID_IBMDSwitcherKeyIterator, (void**)&kIt)) && kIt) {
+    if (SUCCEEDED(meCreateKeyIterator(m_meBlocks[me - 1], (void**)&kIt)) && kIt) {
         IBMDSwitcherKey *k = nullptr;
         int idx = 1;
         while (kIt->Next(&k) == S_OK && k) {
@@ -1213,7 +1371,7 @@ void BmdSwitcherBackend::setUskFlySize(int me, int keyer, float sizeX, float siz
 void BmdSwitcherBackend::setUskFlyRotation(int me, int keyer, float rotation) {
     if (me <= 0 || me > static_cast<int>(m_meBlocks.size())) return;
     IBMDSwitcherKeyIterator *kIt = nullptr;
-    if (SUCCEEDED(m_meBlocks[me - 1]->CreateIterator(IID_IBMDSwitcherKeyIterator, (void**)&kIt)) && kIt) {
+    if (SUCCEEDED(meCreateKeyIterator(m_meBlocks[me - 1], (void**)&kIt)) && kIt) {
         IBMDSwitcherKey *k = nullptr;
         int idx = 1;
         while (kIt->Next(&k) == S_OK && k) {
@@ -1236,7 +1394,7 @@ void BmdSwitcherBackend::setUskFlyRotation(int me, int keyer, float rotation) {
 void BmdSwitcherBackend::resetUskFly(int me, int keyer) {
     if (me <= 0 || me > static_cast<int>(m_meBlocks.size())) return;
     IBMDSwitcherKeyIterator *kIt = nullptr;
-    if (SUCCEEDED(m_meBlocks[me - 1]->CreateIterator(IID_IBMDSwitcherKeyIterator, (void**)&kIt)) && kIt) {
+    if (SUCCEEDED(meCreateKeyIterator(m_meBlocks[me - 1], (void**)&kIt)) && kIt) {
         IBMDSwitcherKey *k = nullptr;
         int idx = 1;
         while (kIt->Next(&k) == S_OK && k) {
@@ -1259,7 +1417,7 @@ void BmdSwitcherBackend::resetUskFly(int me, int keyer) {
 void BmdSwitcherBackend::setUskMask(int me, int keyer, bool enabled, float top, float bottom, float left, float right) {
     if (me <= 0 || me > static_cast<int>(m_meBlocks.size())) return;
     IBMDSwitcherKeyIterator *kIt = nullptr;
-    if (SUCCEEDED(m_meBlocks[me - 1]->CreateIterator(IID_IBMDSwitcherKeyIterator, (void**)&kIt)) && kIt) {
+    if (SUCCEEDED(meCreateKeyIterator(m_meBlocks[me - 1], (void**)&kIt)) && kIt) {
         IBMDSwitcherKey *k = nullptr;
         int idx = 1;
         while (kIt->Next(&k) == S_OK && k) {
@@ -1282,7 +1440,7 @@ void BmdSwitcherBackend::setUskMask(int me, int keyer, bool enabled, float top, 
 void BmdSwitcherBackend::resetUskMask(int me, int keyer) {
     if (me <= 0 || me > static_cast<int>(m_meBlocks.size())) return;
     IBMDSwitcherKeyIterator *kIt = nullptr;
-    if (SUCCEEDED(m_meBlocks[me - 1]->CreateIterator(IID_IBMDSwitcherKeyIterator, (void**)&kIt)) && kIt) {
+    if (SUCCEEDED(meCreateKeyIterator(m_meBlocks[me - 1], (void**)&kIt)) && kIt) {
         IBMDSwitcherKey *k = nullptr;
         int idx = 1;
         while (kIt->Next(&k) == S_OK && k) {
@@ -2051,7 +2209,7 @@ void BmdSwitcherBackend::recallCameraPtzPreset(int camera, int presetIndex) {
 void BmdSwitcherBackend::selectMediaPlayerStill(int player, int stillIndex) {
     if (!m_mediaPool) return;
     IBMDSwitcherMediaPlayerIterator *it = nullptr;
-    if (SUCCEEDED(m_switcher->CreateIterator(IID_IBMDSwitcherMediaPlayerIterator, (void**)&it)) && it) {
+    if (SUCCEEDED(switcherCreateIterator(IID_IBMDSwitcherMediaPlayerIterator, (void**)&it)) && it) {
         IBMDSwitcherMediaPlayer *mp = nullptr;
         int idx = 1;
         while (it->Next(&mp) == S_OK && mp) {
@@ -2070,7 +2228,7 @@ void BmdSwitcherBackend::selectMediaPlayerStill(int player, int stillIndex) {
 void BmdSwitcherBackend::selectMediaPlayerClip(int player, int clipIndex) {
     if (!m_mediaPool) return;
     IBMDSwitcherMediaPlayerIterator *it = nullptr;
-    if (SUCCEEDED(m_switcher->CreateIterator(IID_IBMDSwitcherMediaPlayerIterator, (void**)&it)) && it) {
+    if (SUCCEEDED(switcherCreateIterator(IID_IBMDSwitcherMediaPlayerIterator, (void**)&it)) && it) {
         IBMDSwitcherMediaPlayer *mp = nullptr;
         int idx = 1;
         while (it->Next(&mp) == S_OK && mp) {

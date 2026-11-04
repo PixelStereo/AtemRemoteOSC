@@ -4,6 +4,7 @@
 #include "BmdInclude.h"
 #include <vector>
 #include <QHash>
+#include <QPointer>
 #include <QTimer>
 
 #if defined(ATEM_HAVE_BMD_SDK)
@@ -15,6 +16,16 @@ class RecordMonitor;
 class StreamMonitor;
 class DisplayClockMonitor;
 class MultiViewMonitor;
+
+// Result of one connection attempt, computed off the GUI thread
+struct BmdConnectAttempt {
+    HRESULT hr = E_FAIL;
+    BMDSwitcherConnectToFailure failure = bmdSwitcherConnectToFailureNoResponse;
+    IBMDSwitcherDiscovery *discovery = nullptr;
+    IBMDSwitcher *switcher = nullptr;
+    bool legacy = false;     // the switcher object comes from the older library generation (10.2 - 10.4)
+    bool sdkMissing = false; // no usable Blackmagic library on this computer
+};
 
 class BmdSwitcherBackend : public Atem::IAtemBackend {
     Q_OBJECT
@@ -178,6 +189,20 @@ public:
 
 private:
     void cleanup();
+    void startConnectAttempt();
+    void onConnectAttemptDone(int generation, BmdConnectAttempt result);
+    void finishConnection();
+
+    // With the older library generation some interfaces have a different layout: the calls that sit after the
+    // methods added since then must go through the matching legacy interface (see Legacy/BMDSwitcherAPI_v*.h)
+    HRESULT switcherCreateIterator(REFIID iid, LPVOID *ppv);
+    HRESULT switcherAddCallback(IBMDSwitcherCallback *cb);
+    HRESULT switcherRemoveCallback(IBMDSwitcherCallback *cb);
+    HRESULT meCreateKeyIterator(IBMDSwitcherMixEffectBlock *me, LPVOID *ppv);
+    HRESULT meAddCallback(IBMDSwitcherMixEffectBlock *me, IBMDSwitcherMixEffectBlockCallback *cb);
+    HRESULT meRemoveCallback(IBMDSwitcherMixEffectBlock *me, IBMDSwitcherMixEffectBlockCallback *cb);
+    HRESULT multiViewAddCallback(IBMDSwitcherMultiView *mv, IBMDSwitcherMultiViewCallback *cb);
+    HRESULT multiViewRemoveCallback(IBMDSwitcherMultiView *mv, IBMDSwitcherMultiViewCallback *cb);
     QString sdkDiagnostic() const;
     void queryCapabilities();
     void pollState(bool force);
@@ -223,6 +248,9 @@ private:
     int m_pollTick = 0;
     bool m_cameraFlushInit = false;
     bool m_sdkUnavailable = false;
+    bool m_legacy = false;
+    int m_generation = 0;        // bumped on every connect / disconnect: results of older attempts are dropped
+    int m_attemptsRemaining = 0;
     QHash<QString, QVector<double>> m_snapshot;
 };
 

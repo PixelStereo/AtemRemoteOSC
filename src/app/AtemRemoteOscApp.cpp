@@ -87,7 +87,8 @@ SwitcherInstance* AtemRemoteOscApp::addSwitcher(const SwitcherConfig &config) {
     inst->reconnectTimer->setSingleShot(true);
     inst->reconnectTimer->setInterval(5000);
     connect(inst->reconnectTimer, &QTimer::timeout, this, [this, inst]() {
-        if (!inst->userDisconnected && inst->backend->connectionState() != Atem::ConnectionState::Connected) {
+        const auto state = inst->backend->connectionState();
+        if (!inst->userDisconnected && (state == Atem::ConnectionState::Failed || state == Atem::ConnectionState::Disconnected)) {
             inst->backend->connectTo(inst->config.ip);
         }
     });
@@ -108,8 +109,8 @@ void AtemRemoteOscApp::wireBackend(SwitcherInstance *inst) {
         if (idx >= 0) emit switcherUpdated(idx);
 
         // Keep the link alive unless the user disconnected on purpose
-        if (state == Atem::ConnectionState::Connected) {
-            inst->reconnectTimer->stop();
+        if (state == Atem::ConnectionState::Connected || state == Atem::ConnectionState::Connecting) {
+            inst->reconnectTimer->stop(); // an attempt (with its own retries) is running or done
         } else if (!inst->userDisconnected && inst->config.autoReconnect && !inst->backend->permanentFailure()) {
             inst->reconnectTimer->start();
         }
