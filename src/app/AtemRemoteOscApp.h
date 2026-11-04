@@ -30,6 +30,7 @@ struct SwitcherInstance {
     Atem::IAtemBackend *backend = nullptr;
     Osc::Client *client = nullptr;
     QTimer *reconnectTimer = nullptr;
+    bool keepTrying = false;      // a connection was established: if it is lost, reconnect until it works again
     bool userDisconnected = true; // false once the user asked for a connection that should be kept alive
 };
 

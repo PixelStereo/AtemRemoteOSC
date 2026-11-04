@@ -31,6 +31,7 @@ private slots:
 private:
     void setupUi();
     void updateServerStatusUi(bool listening, quint16 port);
+    void updateOscQueryStatus();
 
     AtemRemoteOscApp *m_app = nullptr;
 

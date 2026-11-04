@@ -64,7 +64,7 @@ ConnectionSettingsWidget::ConnectionSettingsWidget(AtemRemoteOscApp *app, QWidge
     m_chkInvertTBar = new QCheckBox(QStringLiteral("Invert transition handle (T-Bar) values"), this);
     formOsc->addRow(QString(), m_chkInvertTBar);
 
-    m_chkAutoReconnect = new QCheckBox(QStringLiteral("Automatically reconnect on startup"), this);
+    m_chkAutoReconnect = new QCheckBox(QStringLiteral("Connect on startup, and reconnect if the connection is lost"), this);
     formOsc->addRow(QString(), m_chkAutoReconnect);
 
     mainLayout->addWidget(grpOsc);

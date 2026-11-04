@@ -128,12 +128,8 @@ void MainWindow::setupUi() {
     connect(m_btnApplyPort, &QPushButton::clicked, this, &MainWindow::onApplyPortClicked);
     connect(m_chkOscQuery, &QCheckBox::toggled, this, &MainWindow::onOscQueryChanged);
     connect(m_spnOscQueryPort, &QSpinBox::editingFinished, this, &MainWindow::onOscQueryChanged);
-    connect(m_app, &AtemRemoteOscApp::oscQueryStateChanged, this, [this](bool running, quint16 port) {
-        m_lblOscQueryStatus->setText(running ? QStringLiteral("<font color='#2ecc71'>●</font> HTTP %1").arg(port)
-                                             : QStringLiteral("<font color='#9a9aa3'>●</font> off"));
-    });
-    m_lblOscQueryStatus->setText(m_app->isOscQueryRunning() ? QStringLiteral("<font color='#2ecc71'>●</font> HTTP %1").arg(m_app->oscQueryPort())
-                                                            : QStringLiteral("<font color='#9a9aa3'>●</font> off"));
+    connect(m_app, &AtemRemoteOscApp::oscQueryStateChanged, this, [this](bool, quint16) { updateOscQueryStatus(); });
+    updateOscQueryStatus();
 }
 
 void MainWindow::onSwitcherSelected(int index) {
@@ -143,6 +139,16 @@ void MainWindow::onSwitcherSelected(int index) {
 void MainWindow::onApplyPortClicked() {
     quint16 port = static_cast<quint16>(m_spnIncomingPort->value());
     m_app->setIncomingPort(port);
+}
+
+void MainWindow::updateOscQueryStatus() {
+    if (m_app->isOscQueryRunning()) {
+        m_lblOscQueryStatus->setText(QStringLiteral("<font color='#2ecc71'>●</font> HTTP %1").arg(m_app->oscQueryPort()));
+    } else if (m_app->oscQueryEnabled()) {
+        m_lblOscQueryStatus->setText(QStringLiteral("<font color='#e74c3c'>●</font> port %1 busy?").arg(m_app->oscQueryPort()));
+    } else {
+        m_lblOscQueryStatus->setText(QStringLiteral("<font color='#9a9aa3'>●</font> off"));
+    }
 }
 
 void MainWindow::onOscQueryChanged() {

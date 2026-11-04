@@ -140,9 +140,15 @@ void AtemRemoteOscApp::wireBackend(SwitcherInstance *inst) {
         if (idx >= 0) emit switcherUpdated(idx);
 
         // Keep the link alive unless the user disconnected on purpose
-        if (state == Atem::ConnectionState::Connected || state == Atem::ConnectionState::Connecting) {
-            inst->reconnectTimer->stop(); // an attempt (with its own retries) is running or done
-        } else if (!inst->userDisconnected && inst->config.autoReconnect && !inst->backend->permanentFailure()) {
+        if (state == Atem::ConnectionState::Connected) {
+            inst->reconnectTimer->stop();
+            inst->keepTrying = true;
+        } else if (state == Atem::ConnectionState::Connecting) {
+            inst->reconnectTimer->stop(); // an attempt (with its own retries) is running
+        } else if (inst->keepTrying && !inst->userDisconnected && inst->config.autoReconnect
+                   && !inst->backend->permanentFailure()) {
+            // Only a connection that was established and then lost is retried by itself; a switcher that never
+            // answered is not hammered forever (the user presses Connect again)
             inst->reconnectTimer->start();
         }
     });
@@ -188,6 +194,7 @@ void AtemRemoteOscApp::connectSwitcher(int index) {
             return;
         }
         inst->userDisconnected = false;
+        inst->keepTrying = false;
         inst->backend->connectTo(inst->config.ip);
     }
 }
@@ -196,6 +203,7 @@ void AtemRemoteOscApp::disconnectSwitcher(int index) {
     if (index >= 0 && index < m_switchers.size()) {
         auto *inst = m_switchers[index];
         inst->userDisconnected = true;
+        inst->keepTrying = false;
         inst->reconnectTimer->stop();
         inst->backend->disconnectFromSwitcher();
     }
