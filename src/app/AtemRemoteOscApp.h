@@ -10,6 +10,8 @@
 #include "../osc/OscClient.h"
 #include "../osc/OscAddressRegistry.h"
 #include "../osc/OscDispatcher.h"
+#include "../osc/OscQueryServer.h"
+#include "../osc/MdnsResponder.h"
 #include "../backend/IAtemBackend.h"
 #include "../backend/AtemBackendFactory.h"
 
@@ -59,6 +61,12 @@ public:
     // Messages logged before the log console exists (start-up connection attempts)
     const QVector<QPair<QDateTime, QString>>& logHistory() const { return m_logHistory; }
 
+    // OSCQuery: the address space and its values over HTTP, announced on the network
+    bool oscQueryEnabled() const { return m_oscQueryEnabled; }
+    quint16 oscQueryPort() const { return m_oscQueryPort; }
+    bool isOscQueryRunning() const;
+    void setOscQuery(bool enabled, quint16 port);
+
     bool logDebugOsc() const { return m_logDebugOsc; }
     void setLogDebugOsc(bool enable) { m_logDebugOsc = enable; }
 
@@ -67,12 +75,19 @@ signals:
     void switcherUpdated(int index);
     void logMessage(const QString &text);
     void oscServerStateChanged(bool listening, quint16 port);
+    void oscQueryStateChanged(bool running, quint16 port);
 
 private:
     void wireBackend(SwitcherInstance *inst);
+    void restartOscQuery();
 
     quint16 m_incomingPort = 3333;
     bool m_logDebugOsc = false;
+    bool m_oscQueryEnabled = true;
+    quint16 m_oscQueryPort = 3334;
+    Osc::QueryTree *m_queryTree = nullptr;
+    Osc::QueryServer *m_queryServer = nullptr;
+    Osc::MdnsResponder *m_mdns = nullptr;
     QVector<QPair<QDateTime, QString>> m_logHistory;
     QSettings m_settings;
 

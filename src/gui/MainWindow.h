@@ -4,6 +4,7 @@
 #include <QSplitter>
 #include <QTabWidget>
 #include <QSpinBox>
+#include <QCheckBox>
 #include <QPushButton>
 #include <QLabel>
 #include "../app/AtemRemoteOscApp.h"
@@ -25,6 +26,7 @@ private slots:
     void onSwitcherSelected(int index);
     void onApplyPortClicked();
     void onOscServerStateChanged(bool listening, quint16 port);
+    void onOscQueryChanged();
 
 private:
     void setupUi();
@@ -44,4 +46,7 @@ private:
     QSpinBox *m_spnIncomingPort = nullptr;
     QPushButton *m_btnApplyPort = nullptr;
     QLabel *m_lblServerStatus = nullptr;
+    QCheckBox *m_chkOscQuery = nullptr;
+    QSpinBox *m_spnOscQueryPort = nullptr;
+    QLabel *m_lblOscQueryStatus = nullptr;
 };

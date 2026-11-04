@@ -38,6 +38,10 @@ public:
     void setNickname(Atem::IAtemBackend *backend, const QString &nickname);
 
     AddressRegistry* registry() const { return m_registry; }
+    const QList<SwitcherRoute>& routes() const { return m_routes; }
+    // Last value sent as feedback on a full OSC address (e.g. "/atem/me/1/program"), empty if none yet
+    QVector<Value> lastFeedback(const QString &fullAddress) const { return m_lastFeedback.value(fullAddress); }
+    QStringList feedbackAddresses() const { return m_lastFeedback.keys(); }
 
 public slots:
     void dispatchMessage(const Osc::Message &message, const QHostAddress &sender, quint16 port);
@@ -82,6 +86,7 @@ private:
 
     AddressRegistry *m_registry = nullptr;
     QList<SwitcherRoute> m_routes;
+    QHash<QString, QVector<Value>> m_lastFeedback;
 };
 
 } // namespace Osc

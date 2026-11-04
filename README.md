@@ -37,6 +37,7 @@ The OSC address scheme of 4.2 is **kept**, so existing TouchOSC / Open Stage Con
  - **More keyer control**: advanced chroma sample, mask top/bottom/left/right on USK and DSK, full SuperSource box crop and border.
  - **Converted video modes** on aux outputs and stills capture (SDK 11.0).
  - **Complete feedback**: every value above is reported, on change and on request.
+ - **OSCQuery**: the address space and its values over HTTP, announced on the network (mDNS), so compatible controllers discover AtemRemoteOsc by themselves.
  - **Partial updates**: changing one parameter of a group (EQ band, mask, clock layout, PTZ...) no longer resets the others.
  - **Auto reconnect**, connection on launch.
  - **Robust OSC decoding**: malformed packets and deeply nested bundles are rejected instead of misparsed.
@@ -500,6 +501,15 @@ Several addresses map to one SDK call that takes all the parameters of a group (
  - `/atem/dsk/$i/mask/top|bottom|left|right`
  - `/atem/supersource/box/$i/x|y|size|cropped|crop-top|crop-bottom|crop-left|crop-right|crop-reset` (the legacy `/atem/supersource/$i/enabled|source` still work)
  - `/atem/supersource/border/enabled|width-in|width-out|softness-in|softness-out|hue|saturation|luma`
+
+### OSCQuery (new)
+
+AtemRemoteOsc is also an [OSCQuery](https://github.com/Vidvox/OSCQueryProposal) server: it publishes the list of its OSC addresses, with their types and current values, over HTTP, and announces itself on the local network (mDNS / Bonjour, service `_oscjson._tcp`, plus `_osc._udp` for the OSC port). OSCQuery-aware software finds it and builds its interface by itself, without typing any address.
+
+ - Enabled by default, on HTTP port `3334` (checkbox and port in the toolbar).
+ - `GET /` returns the whole tree, `GET /atem/me/1/program` one address, `GET /atem/me/1/program?VALUE` its current value (`TYPE`, `ACCESS`, `DESCRIPTION`, `FULL_PATH` work the same way), `GET /?HOST_INFO` the OSC port to send to.
+ - The tree follows the connected switcher (number of M/Es, downstream keyers, aux outputs, HyperDecks, macros), and the values are those reported as feedback.
+ - It is read-only: commands still go to the OSC UDP port.
 
 ### Feedback
 

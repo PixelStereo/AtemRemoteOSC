@@ -29,6 +29,11 @@ bool AtemRemoteOscApp::initialize() {
     m_registry = new Osc::AddressRegistry(this);
     m_dispatcher = new Osc::Dispatcher(m_registry, this);
     m_oscServer = new Osc::Server(this);
+    m_queryTree = new Osc::QueryTree(m_registry, m_dispatcher);
+    m_queryServer = new Osc::QueryServer(m_queryTree, this);
+    m_mdns = new Osc::MdnsResponder(this);
+    connect(m_queryServer, &Osc::QueryServer::logMessage, this, &AtemRemoteOscApp::logMessage);
+    connect(m_mdns, &Osc::MdnsResponder::logMessage, this, &AtemRemoteOscApp::logMessage);
 
     connect(m_dispatcher, &Osc::Dispatcher::logMessage, this, [this](const QString &msg) {
         if (m_logDebugOsc || !msg.startsWith(QLatin1String("Received OSC"))) {
@@ -65,7 +70,33 @@ bool AtemRemoteOscApp::setIncomingPort(quint16 port) {
         emit logMessage(QStringLiteral("Failed to bind OSC Server to UDP port %1").arg(m_incomingPort));
     }
     emit oscServerStateChanged(ok, m_incomingPort);
+    if (m_queryServer) {
+        m_queryServer->setOscPort(m_incomingPort);
+        if (m_oscQueryEnabled) restartOscQuery(); // the announced "_osc._udp" port changed
+    }
     return ok;
+}
+
+bool AtemRemoteOscApp::isOscQueryRunning() const {
+    return m_queryServer && m_queryServer->isListening();
+}
+
+void AtemRemoteOscApp::setOscQuery(bool enabled, quint16 port) {
+    m_oscQueryEnabled = enabled;
+    m_oscQueryPort = port;
+    restartOscQuery();
+}
+
+void AtemRemoteOscApp::restartOscQuery() {
+    m_mdns->stop();
+    m_queryServer->stop();
+    if (m_oscQueryEnabled && m_queryServer->start(m_oscQueryPort)) {
+        m_queryServer->setOscPort(m_incomingPort);
+        const QString instance = QStringLiteral("AtemRemoteOsc");
+        m_mdns->start(instance, { {QStringLiteral("_oscjson._tcp"), m_queryServer->port()},
+                                  {QStringLiteral("_osc._udp"), m_incomingPort} });
+    }
+    emit oscQueryStateChanged(isOscQueryRunning(), m_queryServer->port());
 }
 
 bool AtemRemoteOscApp::isOscServerListening() const {
@@ -173,6 +204,8 @@ void AtemRemoteOscApp::disconnectSwitcher(int index) {
 void AtemRemoteOscApp::loadSettings() {
     m_incomingPort = static_cast<quint16>(m_settings.value("incomingPort", 3333).toUInt());
     m_logDebugOsc = m_settings.value("logDebugOsc", false).toBool();
+    m_oscQueryEnabled = m_settings.value("oscQueryEnabled", true).toBool();
+    m_oscQueryPort = static_cast<quint16>(m_settings.value("oscQueryPort", 3334).toUInt());
 
     int size = m_settings.beginReadArray("switchers");
     for (int i = 0; i < size; ++i) {
@@ -193,6 +226,8 @@ void AtemRemoteOscApp::loadSettings() {
 void AtemRemoteOscApp::saveSettings() {
     m_settings.setValue("incomingPort", m_incomingPort);
     m_settings.setValue("logDebugOsc", m_logDebugOsc);
+    m_settings.setValue("oscQueryEnabled", m_oscQueryEnabled);
+    m_settings.setValue("oscQueryPort", m_oscQueryPort);
 
     m_settings.beginWriteArray("switchers", m_switchers.size());
     for (int i = 0; i < m_switchers.size(); ++i) {

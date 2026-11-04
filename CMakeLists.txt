@@ -25,6 +25,12 @@ set(SOURCES
     src/osc/OscAddressRegistry.cpp
     src/osc/OscDispatcher.h
     src/osc/OscDispatcher.cpp
+    src/osc/OscQueryTree.h
+    src/osc/OscQueryTree.cpp
+    src/osc/OscQueryServer.h
+    src/osc/OscQueryServer.cpp
+    src/osc/MdnsResponder.h
+    src/osc/MdnsResponder.cpp
     src/backend/AtemTypes.h
     src/backend/IAtemBackend.h
     src/backend/AtemBackendFactory.h
@@ -127,6 +133,12 @@ add_executable(test_osc
     src/osc/OscAddressRegistry.cpp
     src/osc/OscDispatcher.h
     src/osc/OscDispatcher.cpp
+    src/osc/OscQueryTree.h
+    src/osc/OscQueryTree.cpp
+    src/osc/OscQueryServer.h
+    src/osc/OscQueryServer.cpp
+    src/osc/MdnsResponder.h
+    src/osc/MdnsResponder.cpp
     src/backend/AtemTypes.h
     src/backend/IAtemBackend.h
     src/backend/null/NullAtemBackend.h

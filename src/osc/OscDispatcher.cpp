@@ -135,8 +135,10 @@ QString Dispatcher::makeAddress(const QString &nickname, const QString &subAddre
 
 void Dispatcher::sendFeedback(Atem::IAtemBackend *backend, const QString &subAddress, const QVector<Value> &args) {
     for (const auto &r : m_routes) {
-        if (r.backend == backend && r.client && r.client->isValidTarget()) {
-            QString fullAddr = makeAddress(r.nickname, subAddress);
+        if (r.backend != backend) continue;
+        const QString fullAddr = makeAddress(r.nickname, subAddress);
+        m_lastFeedback.insert(fullAddr, args); // also served by OSCQuery
+        if (r.client && r.client->isValidTarget()) {
             r.client->sendMessage(fullAddr, args);
         }
     }
