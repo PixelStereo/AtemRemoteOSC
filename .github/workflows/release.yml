@@ -27,14 +27,10 @@ jobs:
             os: windows-2022
             qt_arch: win64_msvc2019_64
             asset: AtemRemoteOsc-${{ github.ref_name }}-Windows.zip
-          - name: Linux
-            os: ubuntu-22.04
-            asset: AtemRemoteOsc-${{ github.ref_name }}-Linux-x86_64.tar.gz
     steps:
       - uses: actions/checkout@v4
 
       - name: Check the Blackmagic SDK headers are in the repository
-        if: matrix.name != 'Linux'
         shell: bash
         run: test -d "sdk/Blackmagic ATEM Switchers SDK 11.0" || { echo "::error::sdk/ is missing from the repository (macOS and Windows builds need it)"; exit 1; }
 
@@ -44,10 +40,6 @@ jobs:
           version: ${{ env.QT_VERSION }}
           arch: ${{ matrix.qt_arch }}
           cache: true
-
-      - name: Install Linux build dependencies
-        if: matrix.name == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev libxkbcommon-dev
 
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -74,14 +66,6 @@ jobs:
           Copy-Item build/Release/AtemRemoteOsc.exe dist/AtemRemoteOsc/
           windeployqt --release --no-translations dist/AtemRemoteOsc/AtemRemoteOsc.exe
           Compress-Archive -Path dist/AtemRemoteOsc -DestinationPath "${{ matrix.asset }}"
-
-      - name: Package (Linux)
-        if: matrix.name == 'Linux'
-        run: |
-          mkdir -p dist/AtemRemoteOsc
-          cp build/AtemRemoteOsc dist/AtemRemoteOsc/
-          cp README.md dist/AtemRemoteOsc/README.md
-          tar -C dist -czf "${{ matrix.asset }}" AtemRemoteOsc
 
       - uses: actions/upload-artifact@v4
         with:

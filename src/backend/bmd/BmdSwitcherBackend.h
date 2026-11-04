@@ -28,7 +28,7 @@ public:
     QString ipAddress() const override { return m_ip; }
 
     // Connection
-    bool sdkUnavailable() const override { return m_sdkUnavailable; }
+    bool permanentFailure() const override { return m_sdkUnavailable; }
     void connectTo(const QString &ip) override;
     void disconnectFromSwitcher() override;
 

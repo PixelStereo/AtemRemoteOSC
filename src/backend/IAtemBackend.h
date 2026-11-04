@@ -18,9 +18,8 @@ public:
     virtual ConnectionState connectionState() const = 0;
     virtual QString switcherName() const = 0;
     virtual QString ipAddress() const = 0;
-    // True when the last connection attempt failed because the vendor SDK itself could not be loaded
-    // (as opposed to the switcher not answering): another backend can then be used instead.
-    virtual bool sdkUnavailable() const { return false; }
+    // True when a failed connection cannot succeed by retrying (the vendor SDK is missing on this computer)
+    virtual bool permanentFailure() const { return false; }
 
     // Connection
     virtual void connectTo(const QString &ip) = 0;

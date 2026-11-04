@@ -4,15 +4,10 @@
 
 namespace Atem {
 
-enum class BackendType {
-    Auto,
-    OfficialSdk,
-    DirectNetwork
-};
-
 class BackendFactory {
 public:
-    static IAtemBackend* createBackend(BackendType type = BackendType::Auto, QObject *parent = nullptr);
+    // The Blackmagic SDK backend on macOS and Windows, a backend that controls nothing elsewhere
+    static IAtemBackend* createBackend(QObject *parent = nullptr);
 };
 
 } // namespace Atem

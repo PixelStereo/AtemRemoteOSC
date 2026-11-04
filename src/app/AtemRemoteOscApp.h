@@ -21,7 +21,6 @@ struct SwitcherConfig {
     quint16 outgoingPort = 53000;
     bool invertTBar = false;
     bool autoReconnect = true;
-    Atem::BackendType backendType = Atem::BackendType::Auto;
 };
 
 struct SwitcherInstance {
@@ -29,7 +28,6 @@ struct SwitcherInstance {
     Atem::IAtemBackend *backend = nullptr;
     Osc::Client *client = nullptr;
     QTimer *reconnectTimer = nullptr;
-    bool usingFallback = false;   // Auto mode: the SDK was unavailable, the direct network backend is used instead
     bool userDisconnected = true; // false once the user asked for a connection that should be kept alive
 };
 
@@ -72,7 +70,6 @@ signals:
 
 private:
     void wireBackend(SwitcherInstance *inst);
-    void replaceBackend(SwitcherInstance *inst, Atem::BackendType type);
 
     quint16 m_incomingPort = 3333;
     bool m_logDebugOsc = false;

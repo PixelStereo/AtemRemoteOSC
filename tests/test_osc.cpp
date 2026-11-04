@@ -5,11 +5,10 @@
 #include "../src/osc/OscPacket.h"
 #include "../src/osc/OscAddressRegistry.h"
 #include "../src/osc/OscDispatcher.h"
-#include "../src/backend/network/NetworkAtemBackend.h"
-#include "../src/backend/network/AtemPacket.h"
+#include "../src/backend/null/NullAtemBackend.h"
 
 // Records the calls the dispatcher makes, without needing a switcher
-class RecordingBackend : public AtemNet::NetworkAtemBackend {
+class RecordingBackend : public NullAtemBackend {
 public:
     QStringList calls;
 
@@ -91,7 +90,7 @@ private slots:
     void testDispatcherRouting() {
         Osc::AddressRegistry registry;
         Osc::Dispatcher dispatcher(&registry);
-        AtemNet::NetworkAtemBackend backend;
+        NullAtemBackend backend;
         Osc::Client client;
 
         dispatcher.addSwitcher("", &backend, &client);
@@ -153,31 +152,6 @@ private slots:
         out.clear();
         Osc::Packet::decode(nested, out);
         QVERIFY(out.isEmpty());
-    }
-
-    void testAtemPacketLayer() {
-        QByteArray hello = AtemNet::Packet::createHello();
-        QCOMPARE(hello.size(), 20);
-        AtemNet::PacketHeader h;
-        QVERIFY(AtemNet::Packet::parseHeader(hello, h));
-        QCOMPARE(int(h.flags), int(AtemNet::FlagNewSession));
-        QCOMPARE(int(h.length), 20);
-
-        QByteArray ack = AtemNet::Packet::createAck(0x8123, 7);
-        QVERIFY(AtemNet::Packet::parseHeader(ack, h));
-        QCOMPARE(int(h.flags), int(AtemNet::FlagAckReply));
-        QCOMPARE(int(h.sessionId), 0x8123);
-        QCOMPARE(int(h.ackedPacketId), 7);
-
-        uint16_t seq = 0;
-        QByteArray cmd = AtemNet::Packet::createCommandPacket(0x8123, seq, QByteArray(8, 'x'));
-        QCOMPARE(int(seq), 1);
-        QVERIFY(AtemNet::Packet::parseHeader(cmd, h));
-        QCOMPARE(int(h.flags), int(AtemNet::FlagAckRequest));
-        QCOMPARE(int(h.length), 20);
-        QCOMPARE(int(h.packetId), 1);
-        AtemNet::Packet::createCommandPacket(0x8123, seq, QByteArray());
-        QCOMPARE(int(seq), 2);
     }
 
     void testLegacyAddressesAndParameterMerging() {

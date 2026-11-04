@@ -79,7 +79,7 @@ SwitcherInstance* AtemRemoteOscApp::addSwitcher(const SwitcherConfig &config) {
         inst->config.id = QUuid::createUuid().toString();
     }
 
-    inst->backend = Atem::BackendFactory::createBackend(inst->config.backendType, this);
+    inst->backend = Atem::BackendFactory::createBackend(this);
     inst->client = new Osc::Client(this);
     inst->client->setTarget(inst->config.outgoingIp, inst->config.outgoingPort);
 
@@ -101,40 +101,16 @@ SwitcherInstance* AtemRemoteOscApp::addSwitcher(const SwitcherConfig &config) {
     return inst;
 }
 
-void AtemRemoteOscApp::replaceBackend(SwitcherInstance *inst, Atem::BackendType type) {
-    inst->userDisconnected = true;
-    inst->reconnectTimer->stop();
-    inst->backend->disconnectFromSwitcher();
-    m_dispatcher->removeSwitcher(inst->backend);
-    inst->backend->deleteLater(); // may be called from one of its own signals
-    inst->backend = Atem::BackendFactory::createBackend(type, this);
-    wireBackend(inst);
-    m_dispatcher->addSwitcher(inst->config.nickname, inst->backend, inst->client, inst->config.invertTBar);
-}
-
 void AtemRemoteOscApp::wireBackend(SwitcherInstance *inst) {
     connect(inst->backend, &Atem::IAtemBackend::logMessage, this, &AtemRemoteOscApp::logMessage);
     connect(inst->backend, &Atem::IAtemBackend::connectionStateChanged, this, [this, inst](Atem::ConnectionState state) {
         int idx = m_switchers.indexOf(inst);
         if (idx >= 0) emit switcherUpdated(idx);
 
-        // Auto mode: when the vendor SDK cannot be loaded on this computer, use the direct network protocol
-        if (state == Atem::ConnectionState::Failed && !inst->usingFallback && !inst->userDisconnected
-            && inst->config.backendType == Atem::BackendType::Auto && inst->backend->sdkUnavailable()) {
-            inst->usingFallback = true;
-            emit logMessage(QStringLiteral("Blackmagic SDK unavailable: using the direct network protocol instead."));
-            replaceBackend(inst, Atem::BackendType::DirectNetwork);
-            QTimer::singleShot(0, this, [this, inst]() {
-                const int i = m_switchers.indexOf(inst);
-                if (i >= 0) connectSwitcher(i);
-            });
-            return;
-        }
-
         // Keep the link alive unless the user disconnected on purpose
         if (state == Atem::ConnectionState::Connected) {
             inst->reconnectTimer->stop();
-        } else if (!inst->userDisconnected && inst->config.autoReconnect) {
+        } else if (!inst->userDisconnected && inst->config.autoReconnect && !inst->backend->permanentFailure()) {
             inst->reconnectTimer->start();
         }
     });
@@ -161,20 +137,12 @@ void AtemRemoteOscApp::removeSwitcher(int index) {
 void AtemRemoteOscApp::updateSwitcherConfig(int index, const SwitcherConfig &config) {
     if (index >= 0 && index < m_switchers.size()) {
         auto *inst = m_switchers[index];
-        bool backendTypeChanged = (inst->config.backendType != config.backendType);
         inst->config = config;
 
         inst->client->setTarget(config.outgoingIp, config.outgoingPort);
 
-        if (backendTypeChanged) {
-            const bool wasConnected = !inst->userDisconnected;
-            inst->usingFallback = false;
-            replaceBackend(inst, inst->config.backendType);
-            if (wasConnected) connectSwitcher(index);
-        } else {
             m_dispatcher->setInvertTBar(inst->backend, config.invertTBar);
             m_dispatcher->setNickname(inst->backend, config.nickname);
-        }
 
         emit switcherUpdated(index);
     }
@@ -216,7 +184,6 @@ void AtemRemoteOscApp::loadSettings() {
         cfg.outgoingPort = static_cast<quint16>(m_settings.value("outgoingPort", 53000).toUInt());
         cfg.invertTBar = m_settings.value("invertTBar", false).toBool();
         cfg.autoReconnect = m_settings.value("autoReconnect", true).toBool();
-        cfg.backendType = static_cast<Atem::BackendType>(m_settings.value("backendType", 0).toInt());
         addSwitcher(cfg);
     }
     m_settings.endArray();
@@ -237,7 +204,6 @@ void AtemRemoteOscApp::saveSettings() {
         m_settings.setValue("outgoingPort", cfg.outgoingPort);
         m_settings.setValue("invertTBar", cfg.invertTBar);
         m_settings.setValue("autoReconnect", cfg.autoReconnect);
-        m_settings.setValue("backendType", static_cast<int>(cfg.backendType));
     }
     m_settings.endArray();
 }

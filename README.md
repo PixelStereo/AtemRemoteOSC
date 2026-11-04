@@ -10,17 +10,17 @@ atemOSC was created by [Daniel Büchele](https://github.com/danielbuechele) and 
 
 Peter Steffey has since moved atemOSC to a paid version 5. This fork starts from the open-source code of 4.2 and **changes course**: it is a complete rewrite in **C++17 / Qt 6** with CMake, kept free and open.
 
-To avoid any confusion with the original project and its version numbers, this fork has its own name, **AtemRemoteOsc**, and its own releases (currently **5.0.2**).
+To avoid any confusion with the original project and its version numbers, this fork has its own name, **AtemRemoteOsc**, and its own releases (currently **5.0.3**).
 
-> **A word of thanks.** The aim of this project is not to belittle Peter Steffey's work, nor that of the other contributors. atemOSC exists, and is as good as it is, thanks to years of generous effort on their part, and everything here stands on the shoulders of that work. Anyone who wants the official, supported, actively developed atemOSC on macOS should go to [atemosc.com](https://www.atemosc.com) and support the original author. This fork simply offers a *different* alternative, with other priorities: cross-platform (Windows and Linux), free and open source, and a wider coverage of the Blackmagic SDK. Thank you, Peter, for all of it.
+> **A word of thanks.** The aim of this project is not to belittle Peter Steffey's work, nor that of the other contributors. atemOSC exists, and is as good as it is, thanks to years of generous effort on their part, and everything here stands on the shoulders of that work. Anyone who wants the official, supported, actively developed atemOSC on macOS should go to [atemosc.com](https://www.atemosc.com) and support the original author. This fork simply offers a *different* alternative, with other priorities: cross-platform (macOS and Windows), free and open source, and a wider coverage of the Blackmagic SDK. Thank you, Peter, for all of it.
 
 
 | | 4.2 (SteffeyDev, last open-source release) | AtemRemoteOsc (this fork) |
 |---|---|---|
-| Platforms | macOS | **macOS, Windows, Linux** |
+| Platforms | macOS | **macOS, Windows** |
 | Language / UI | Objective-C++, Cocoa, Xcode | C++17, Qt 6 Widgets, CMake |
 | OSC engine | VVOSC | Own implementation on `QUdpSocket` (messages and bundles) |
-| Switcher access | Blackmagic SDK (macOS) | Blackmagic SDK 11.0 on macOS/Windows, **direct UDP protocol on Linux** (no Blackmagic software needed) |
+| Switcher access | Blackmagic SDK (macOS) | Blackmagic SDK 11.0 (macOS and Windows) |
 | Feedback | Callback based, partial | Whole state polled and diffed, sent as soon as it changes |
 | Releases | Manual, notarized | GitHub Actions builds for the three platforms on every `vX` tag |
 
@@ -28,7 +28,7 @@ The OSC address scheme of 4.2 is **kept**, so existing TouchOSC / Open Stage Con
 
 ### What is new compared to 4.2
 
- - **Windows and Linux support** (Linux uses a built-in implementation of the ATEM UDP protocol on port 9910).
+ - **Windows support**, with the same feature set as macOS.
  - **Camera control and PTZ**: iris, focus, autofocus, gain, shutter, white balance, PTZ speed and presets, with feedback.
  - **Fairlight audio**: solo, analog preamp / phantom / low-cut, 6-band EQ, compressor, limiter, expander.
  - **MultiView**: layout, per-window source, safe area, VU meters.
@@ -38,20 +38,23 @@ The OSC address scheme of 4.2 is **kept**, so existing TouchOSC / Open Stage Con
  - **Converted video modes** on aux outputs and stills capture (SDK 11.0).
  - **Complete feedback**: every value above is reported, on change and on request.
  - **Partial updates**: changing one parameter of a group (EQ band, mask, clock layout, PTZ...) no longer resets the others.
- - **Auto reconnect**, connection on launch, per-switcher backend choice (SDK or direct network).
+ - **Auto reconnect**, connection on launch.
  - **Robust OSC decoding**: malformed packets and deeply nested bundles are rejected instead of misparsed.
  - Unit tests (`ctest`) covering OSC encoding/decoding, the ATEM packet layer, address handling and parameter merging.
 
+## Requirements
+
+AtemRemoteOsc talks to the switcher through the official Blackmagic SDK, which relies on a library installed by **ATEM Software Control**. Install the latest version of ATEM Software Control on the computer that runs AtemRemoteOsc (the same version as the switcher firmware, or newer). If it is missing or too old, the log says so and the connection fails. There is no Linux support, since the SDK does not exist there; the code still builds on Linux for development and tests.
+
 ## Current limitations
 
- - This rewrite is **young**. It compiles and its tests pass on macOS, but it has **not been validated against a real switcher yet**. The Windows build has never been compiled. Please report problems.
- - The **Linux direct-network backend** supports program/preview, transitions, keyers (on-air, tie, type, sources), downstream keyers, aux, macros, recording and streaming start/stop, classic audio, MultiView window sources and media player selection. Other features (Fairlight, camera, clock, SuperSource, HyperDeck, luma/chroma/fly/mask parameters) log "not available with the direct network backend" instead of acting. The protocol command codes were written from memory of the ATEM protocol and still have to be confirmed on hardware.
+ - This rewrite is **young**. It compiles and its tests pass on macOS, but it has **not been validated against a real switcher yet**. The Windows build compiles in CI but has never been run on a real machine. Please report problems.
  - Not implemented yet: USK DVE border parameters, fly rate, `audio/output/balance`, DVE and stinger transition parameters, Fairlight and HyperDeck feedback.
  - Builds are not code-signed or notarized (macOS will show a Gatekeeper warning on first launch: right click, Open).
 
 ## Download
 
-Prebuilt macOS (`.dmg`), Windows (`.zip`) and Linux (`.tar.gz`, requires Qt 6) packages are attached to each release on the [releases page](https://github.com/PixelStereo/AtemRemoteOsc/releases).
+Prebuilt macOS (`.dmg`) and Windows (`.zip`) packages are attached to each release on the [releases page](https://github.com/PixelStereo/AtemRemoteOsc/releases).
 
 ## Build from source
 
@@ -73,11 +76,11 @@ ctest --test-dir build --output-on-failure
 
 ### Releasing
 
-Push a tag starting with `v` (for example `git tag v5.0.2 && git push origin v5.0.2`). The workflow in `.github/workflows/release.yml` builds, tests and packages the three platforms and publishes the GitHub release.
+Push a tag starting with `v` (for example `git tag v5.0.3 && git push origin v5.0.3`). The workflow in `.github/workflows/release.yml` builds, tests and packages the three platforms and publishes the GitHub release.
 
 ## Setup and Usage
 
-After launching the application, enter the IP address of the switcher, choose the backend (the official SDK on macOS / Windows, direct network on Linux) and which local port to listen on (default 3333), and then send OSC commands to the IP address of the computer running AtemRemoteOsc that port.  If you set an outgoing IP address and port, AtemRemoteOsc will send status updates and feedback OSC messages to the IP address and port you specified.
+After launching the application, enter the IP address of the switcher, and which local port to listen on (default 3333), and then send OSC commands to the IP address of the computer running AtemRemoteOsc that port.  If you set an outgoing IP address and port, AtemRemoteOsc will send status updates and feedback OSC messages to the IP address and port you specified.
 
 **If you are sending AtemRemoteOsc messages from a queueing software or translation software on the same computer that AtemRemoteOsc is running on**, make sure to send messages to `127.0.0.1` (localhost) on the port that AtemRemoteOsc is listening on.
 
@@ -544,7 +547,7 @@ Set the IP address to be the broadcast address for your network.  This will caus
 There are a myriad of issues that can come up with connecting AtemRemoteOsc to your ATEM switcher.  Even once you get it connected, sometimes certain features that are supported by your switcher (e.g. recording) do not work with AtemRemoteOsc.
 
 #### Solution
-If possible, upgrade your switcher's firmware to the latest version supported, and on macOS and Windows (SDK backend), upgrade the version of ATEM Software Control installed on the computer running AtemRemoteOsc to match the switcher; on Linux, make sure UDP port 9910 is reachable. AtemRemoteOsc does not have any strong ties to the version of your ATEM switcher, so often the issue is that the ATEM Software Control version is out of sync with the ATEM switcher's firmware version, and making those version's match may solve the issue AtemRemoteOsc is having. If that doesn't fix it, try to find and use the latest version of AtemRemoteOsc that supports the switcher firmware version you are running.  If you are stuck on an older firmware version, you may have to use a previous version of AtemRemoteOsc.
+If possible, upgrade your switcher's firmware to the latest version supported, and upgrade the version of ATEM Software Control installed on the computer running AtemRemoteOsc to match the switcher. AtemRemoteOsc does not have any strong ties to the version of your ATEM switcher, so often the issue is that the ATEM Software Control version is out of sync with the ATEM switcher's firmware version, and making those version's match may solve the issue AtemRemoteOsc is having. If that doesn't fix it, try to find and use the latest version of AtemRemoteOsc that supports the switcher firmware version you are running.  If you are stuck on an older firmware version, you may have to use a previous version of AtemRemoteOsc.
 
 -----------
 

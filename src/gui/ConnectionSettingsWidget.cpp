@@ -34,11 +34,6 @@ ConnectionSettingsWidget::ConnectionSettingsWidget(AtemRemoteOscApp *app, QWidge
     m_txtNickname->setPlaceholderText(QStringLiteral("Optional (required if using multiple switchers)"));
     formConn->addRow(QStringLiteral("OSC Nickname:"), m_txtNickname);
 
-    m_cmbBackend = new QComboBox(this);
-    m_cmbBackend->addItem(QStringLiteral("Auto (Recommended)"), static_cast<int>(Atem::BackendType::Auto));
-    m_cmbBackend->addItem(QStringLiteral("Official Blackmagic SDK 11.0"), static_cast<int>(Atem::BackendType::OfficialSdk));
-    m_cmbBackend->addItem(QStringLiteral("Direct UDP Network Protocol (port 9910)"), static_cast<int>(Atem::BackendType::DirectNetwork));
-    formConn->addRow(QStringLiteral("Driver Backend:"), m_cmbBackend);
 
     auto *btnConnLayout = new QHBoxLayout;
     m_btnConnect = new QPushButton(QStringLiteral("Connect"), this);
@@ -85,7 +80,6 @@ ConnectionSettingsWidget::ConnectionSettingsWidget(AtemRemoteOscApp *app, QWidge
     connect(m_spnOutgoingPort, QOverload<int>::of(&QSpinBox::valueChanged), this, &ConnectionSettingsWidget::applySettings);
     connect(m_chkInvertTBar, &QCheckBox::toggled, this, &ConnectionSettingsWidget::applySettings);
     connect(m_chkAutoReconnect, &QCheckBox::toggled, this, &ConnectionSettingsWidget::applySettings);
-    connect(m_cmbBackend, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ConnectionSettingsWidget::applySettings);
 
     connect(m_app, &AtemRemoteOscApp::switcherUpdated, this, [this](int idx) {
         if (idx == m_currentIndex) {
@@ -117,9 +111,6 @@ void ConnectionSettingsWidget::updateUiFromConfig() {
     m_spnOutgoingPort->setValue(sw->config.outgoingPort);
     m_chkInvertTBar->setChecked(sw->config.invertTBar);
     m_chkAutoReconnect->setChecked(sw->config.autoReconnect);
-
-    int bIdx = m_cmbBackend->findData(static_cast<int>(sw->config.backendType));
-    if (bIdx >= 0) m_cmbBackend->setCurrentIndex(bIdx);
 
     updateStatus();
 
@@ -168,7 +159,6 @@ void ConnectionSettingsWidget::applySettings() {
     cfg.outgoingPort = static_cast<quint16>(m_spnOutgoingPort->value());
     cfg.invertTBar = m_chkInvertTBar->isChecked();
     cfg.autoReconnect = m_chkAutoReconnect->isChecked();
-    cfg.backendType = static_cast<Atem::BackendType>(m_cmbBackend->currentData().toInt());
 
     m_app->updateSwitcherConfig(m_currentIndex, cfg);
 }

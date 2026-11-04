@@ -32,7 +32,6 @@ private:
     QLabel *m_lblStatus = nullptr;
     QLineEdit *m_txtIp = nullptr;
     QLineEdit *m_txtNickname = nullptr;
-    QComboBox *m_cmbBackend = nullptr;
     QPushButton *m_btnConnect = nullptr;
     QPushButton *m_btnDisconnect = nullptr;
 

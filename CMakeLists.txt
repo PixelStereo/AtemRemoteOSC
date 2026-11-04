@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(AtemRemoteOsc VERSION 5.0.2 LANGUAGES C CXX)
+project(AtemRemoteOsc VERSION 5.0.3 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -29,10 +29,7 @@ set(SOURCES
     src/backend/IAtemBackend.h
     src/backend/AtemBackendFactory.h
     src/backend/AtemBackendFactory.cpp
-    src/backend/network/AtemPacket.h
-    src/backend/network/AtemPacket.cpp
-    src/backend/network/NetworkAtemBackend.h
-    src/backend/network/NetworkAtemBackend.cpp
+    src/backend/null/NullAtemBackend.h
     src/gui/Theme.h
     src/gui/Theme.cpp
     src/gui/MainWindow.h
@@ -131,10 +128,7 @@ add_executable(test_osc
     src/osc/OscDispatcher.cpp
     src/backend/AtemTypes.h
     src/backend/IAtemBackend.h
-    src/backend/network/AtemPacket.h
-    src/backend/network/AtemPacket.cpp
-    src/backend/network/NetworkAtemBackend.h
-    src/backend/network/NetworkAtemBackend.cpp
+    src/backend/null/NullAtemBackend.h
 )
 target_link_libraries(test_osc PRIVATE
     Qt6::Core
