@@ -13,69 +13,32 @@ env:
   QT_VERSION: 6.7.3
 
 jobs:
-  # Job Windows : utilise le runner standard hébergé par GitHub
-  build-windows:
-    name: Build Windows
-    runs-on: windows-2022
-    env:
-      QT_ARCH: win64_msvc2019_64
-      ASSET: AtemRemoteOsc-${{ github.ref_name }}-Windows.zip
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-15
+            asset: AtemRemoteOsc-${{ github.ref_name }}-macOS.dmg
+          - name: Windows
+            os: windows-2022
+            qt_arch: win64_msvc2019_64
+            asset: AtemRemoteOsc-${{ github.ref_name }}-Windows.zip
     steps:
       - uses: actions/checkout@v4
 
       - name: Check the Blackmagic SDK headers are in the repository
         shell: bash
-        run: test -d "sdk/Blackmagic ATEM Switchers SDK 11.0" || { echo "::error::sdk/ is missing from the repository"; exit 1; }
+        run: test -d "sdk/Blackmagic ATEM Switchers SDK 11.0" || { echo "::error::sdk/ is missing from the repository (macOS and Windows builds need it)"; exit 1; }
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
-          arch: ${{ env.QT_ARCH }}
-          cache: true
-
-      - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: cmake --build build --config Release --parallel
-
-      - name: Test
-        run: ctest --test-dir build -C Release --output-on-failure
-        env:
-          QT_QPA_PLATFORM: offscreen
-
-      - name: Package (Windows)
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Path dist/AtemRemoteOsc | Out-Null
-          Copy-Item build/Release/AtemRemoteOsc.exe dist/AtemRemoteOsc/
-          windeployqt --release --no-translations dist/AtemRemoteOsc/AtemRemoteOsc.exe
-          Compress-Archive -Path dist/AtemRemoteOsc -DestinationPath "${{ env.ASSET }}"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Windows
-          path: ${{ env.ASSET }}
-          if-no-files-found: error
-
-  # Job macOS : tourne exclusivement sur votre runner self-hosted
-  build-macos:
-    name: Build macOS
-    runs-on: [self-hosted, macOS] # Modifiez si votre runner a un autre label personnalisé
-    env:
-      ASSET: AtemRemoteOsc-${{ github.ref_name }}-macOS.dmg
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check the Blackmagic SDK headers are in the repository
-        shell: bash
-        run: test -d "sdk/Blackmagic ATEM Switchers SDK 11.0" || { echo "::error::sdk/ is missing from the repository"; exit 1; }
-
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: ${{ env.QT_VERSION }}
+          arch: ${{ matrix.qt_arch }}
           cache: true
 
       - name: Configure
@@ -90,19 +53,29 @@ jobs:
           QT_QPA_PLATFORM: offscreen
 
       - name: Package (macOS)
+        if: matrix.name == 'macOS'
         run: |
           macdeployqt build/AtemRemoteOsc.app -dmg
-          mv build/AtemRemoteOsc.dmg "${{ env.ASSET }}"
+          mv build/AtemRemoteOsc.dmg "${{ matrix.asset }}"
+
+      - name: Package (Windows)
+        if: matrix.name == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist/AtemRemoteOsc | Out-Null
+          Copy-Item build/Release/AtemRemoteOsc.exe dist/AtemRemoteOsc/
+          windeployqt --release --no-translations dist/AtemRemoteOsc/AtemRemoteOsc.exe
+          Compress-Archive -Path dist/AtemRemoteOsc -DestinationPath "${{ matrix.asset }}"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: macOS
-          path: ${{ env.ASSET }}
+          name: ${{ matrix.name }}
+          path: ${{ matrix.asset }}
           if-no-files-found: error
 
   release:
     name: Publish release
-    needs: [build-windows, build-macos] # Attend les deux jobs de build
+    needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-22.04
     permissions:
