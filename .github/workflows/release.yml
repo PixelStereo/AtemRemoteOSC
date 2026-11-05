@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: # build only, no release
+
+permissions:
+  contents: read
+
+env:
+  QT_VERSION: 6.10.3
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+            asset: AtemRemoteOsc-${{ github.ref_name }}-macOS.dmg
+          - name: Windows
+            os: windows-latest
+            qt_arch: win64_msvc2022_64
+            asset: AtemRemoteOsc-${{ github.ref_name }}-Windows.zip
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the Blackmagic SDK headers are in the repository
+        shell: bash
+        run: test -d "sdk/Blackmagic ATEM Switchers SDK 11.0" || { echo "::error::sdk/ is missing from the repository (macOS and Windows builds need it)"; exit 1; }
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: ${{ matrix.qt_arch }}
+          cache: true
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+        env:
+          QT_QPA_PLATFORM: offscreen
+
+      - name: Package (macOS)
+        if: matrix.name == 'macOS'
+        run: |
+          macdeployqt build/AtemRemoteOsc.app -dmg
+          mv build/AtemRemoteOsc.dmg "${{ matrix.asset }}"
+
+      - name: Package (Windows)
+        if: matrix.name == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path dist/AtemRemoteOsc | Out-Null
+          Copy-Item build/Release/AtemRemoteOsc.exe dist/AtemRemoteOsc/
+          windeployqt --release --no-translations dist/AtemRemoteOsc/AtemRemoteOsc.exe
+          Compress-Archive -Path dist/AtemRemoteOsc -DestinationPath "${{ matrix.asset }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: assets/*
+          generate_release_notes: true
