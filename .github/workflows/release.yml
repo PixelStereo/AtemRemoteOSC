@@ -21,10 +21,10 @@ jobs:
       matrix:
         include:
           - name: macOS
-            os: macos-15
+            os: macos-latest
             asset: AtemRemoteOsc-${{ github.ref_name }}-macOS.dmg
           - name: Windows
-            os: windows-2022
+            os: windows-latest
             qt_arch: win64_msvc2019_64
             asset: AtemRemoteOsc-${{ github.ref_name }}-Windows.zip
     steps:
@@ -77,7 +77,7 @@ jobs:
     name: Publish release
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
