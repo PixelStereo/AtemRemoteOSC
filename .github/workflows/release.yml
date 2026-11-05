@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  QT_VERSION: 6.7.3
+  QT_VERSION: 6.10.3
 
 jobs:
   build:
@@ -25,7 +25,7 @@ jobs:
             asset: AtemRemoteOsc-${{ github.ref_name }}-macOS.dmg
           - name: Windows
             os: windows-latest
-            qt_arch: win64_msvc2019_64
+            qt_arch: win64_msvc2022_64
             asset: AtemRemoteOsc-${{ github.ref_name }}-Windows.zip
     steps:
       - uses: actions/checkout@v4

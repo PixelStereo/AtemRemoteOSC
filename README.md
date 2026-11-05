@@ -71,7 +71,7 @@ The Blackmagic SDK 11.0 headers needed on macOS and Windows are included in `sdk
 ./build.sh            # installs dependencies (Homebrew / apt / dnf / pacman / zypper), builds and runs the tests
 ```
 
-Options: `--debug`, `--clean`, `--no-deps`, `--no-test`. On Windows, run it from Git Bash with Qt and Visual Studio installed and set `QT_DIR` (for example `QT_DIR=C:/Qt/6.7.3/msvc2019_64 ./build.sh --no-deps`).
+Options: `--debug`, `--clean`, `--no-deps`, `--no-test`. On Windows, run it from Git Bash with Qt and Visual Studio installed and set `QT_DIR` (for example `QT_DIR=C:/Qt/6.10.3/msvc2022_64 ./build.sh --no-deps`).
 
 Manually: Qt 6.2+ (Core, Gui, Widgets, Network, Test), CMake 3.16+, a C++17 compiler.
 

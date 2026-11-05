@@ -9,7 +9,7 @@
 #
 # macOS: Homebrew. Linux: apt, dnf, pacman or zypper (uses sudo).
 # Windows: run from Git Bash/MSYS with Qt 6 + Visual Studio installed, and set QT_DIR
-#          (e.g. QT_DIR=C:/Qt/6.7.0/msvc2019_64 ./build.sh --no-deps).
+#          (e.g. QT_DIR=C:/Qt/6.10.3/msvc2022_64 ./build.sh --no-deps).
 
 set -euo pipefail
 
@@ -95,7 +95,7 @@ configure_platform() {
             JOBS="$(nproc)"
             ;;
         MINGW*|MSYS*|CYGWIN*)
-            [ -n "${QT_DIR:-}" ] || die "Set QT_DIR to your Qt kit, e.g. QT_DIR=C:/Qt/6.7.0/msvc2019_64"
+            [ -n "${QT_DIR:-}" ] || die "Set QT_DIR to your Qt kit, e.g. QT_DIR=C:/Qt/6.10.3/msvc2022_64"
             CMAKE_ARGS+=("-DCMAKE_PREFIX_PATH=$QT_DIR")
             JOBS="${NUMBER_OF_PROCESSORS:-4}"
             ;;
