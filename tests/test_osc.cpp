@@ -8,6 +8,7 @@
 #include "../src/osc/OscQueryTree.h"
 #include "../src/osc/OscQueryServer.h"
 #include "../src/osc/MdnsResponder.h"
+#include "../src/osc/TimedTransition.h"
 #include <QJsonArray>
 #include <QJsonDocument>
 #include "../src/backend/null/NullAtemBackend.h"
@@ -30,6 +31,8 @@ public:
     void setDisplayClockLayout(float s, float x, float y, float o) override {
         calls << QString("clock %1 %2 %3 %4").arg(s).arg(x).arg(y).arg(o);
     }
+    QVector<float> positions;
+    void setTransitionPosition(int, float p) override { positions << p; }
     void setMultiViewLayout(int mv, Atem::MultiViewLayout l) override { calls << QString("layout %1 %2").arg(mv).arg(int(l)); }
 };
 
@@ -208,6 +211,102 @@ private slots:
         QCOMPARE(server.answer("GET", "/nope").status, 404);
         QCOMPARE(server.answer("POST", "/").status, 405);
         QCOMPARE(server.answer("OPTIONS", "/").status, 204);
+    }
+
+    void testTimedTransitionCurves() {
+        using C = Osc::TimedTransition::Curve;
+        for (C curve : {C::Linear, C::EaseIn, C::EaseOut, C::EaseInOut}) {
+            QCOMPARE(Osc::TimedTransition::apply(curve, 0.0), 0.0);
+            QCOMPARE(Osc::TimedTransition::apply(curve, 1.0), 1.0);
+        }
+        QCOMPARE(Osc::TimedTransition::apply(C::Linear, 0.3), 0.3);
+        QCOMPARE(Osc::TimedTransition::apply(C::EaseIn, 0.5), 0.25);
+        QCOMPARE(Osc::TimedTransition::apply(C::EaseOut, 0.5), 0.75);
+        QCOMPARE(Osc::TimedTransition::apply(C::EaseInOut, 0.5), 0.5);
+        QVERIFY(Osc::TimedTransition::apply(C::EaseInOut, 0.1) < 0.1); // slow start
+        QVERIFY(Osc::TimedTransition::apply(C::EaseInOut, 0.9) > 0.9); // slow end
+
+        C parsed = C::Linear;
+        QVERIFY(Osc::TimedTransition::parseCurve("ease", parsed));
+        QCOMPARE(int(parsed), int(C::EaseInOut));
+        QVERIFY(Osc::TimedTransition::parseCurve("Ease_In", parsed));
+        QCOMPARE(int(parsed), int(C::EaseIn));
+        QVERIFY(!Osc::TimedTransition::parseCurve("bounce", parsed));
+    }
+
+    void testTimedTransitionViaOsc() {
+        Osc::AddressRegistry registry;
+        Osc::Dispatcher dispatcher(&registry);
+        RecordingBackend backend;
+        Osc::Client client;
+        dispatcher.addSwitcher("", &backend, &client);
+        auto send = [&](const QString &addr, auto... args) {
+            Osc::Message m(addr);
+            (addArg(m, args), ...);
+            dispatcher.dispatchMessage(m, QHostAddress::LocalHost, 1);
+        };
+        auto increasing = [](const QVector<float> &v) {
+            for (int i = 1; i < v.size(); ++i) if (v[i] < v[i - 1]) return false;
+            return true;
+        };
+
+        // No curve given: ease-in-out, ends at 1.0
+        send("/atem/transition/timed", 0.3f);
+        QTest::qWait(450);
+        QVERIFY(backend.positions.size() > 5);
+        QVERIFY(increasing(backend.positions));
+        QCOMPARE(backend.positions.last(), 1.0f);
+        QVERIFY(backend.positions.first() < 0.1f); // slow start
+        backend.positions.clear();
+
+        // Curve as second argument, and in the address
+        send("/atem/transition/timed", 0.2f, QString("linear"));
+        QTest::qWait(350);
+        QCOMPARE(backend.positions.last(), 1.0f);
+        backend.positions.clear();
+        send("/atem/me/1/transition/timed/ease-out", 0.2f);
+        QTest::qWait(350);
+        QCOMPARE(backend.positions.last(), 1.0f);
+        backend.positions.clear();
+
+        // Pause, resume
+        send("/atem/transition/timed/linear", 5.0f);
+        QTest::qWait(120);
+        send("/atem/transition/timed/pause");
+        const int paused = backend.positions.size();
+        QVERIFY(paused > 0);
+        QTest::qWait(100);
+        QCOMPARE(backend.positions.size(), paused);
+        send("/atem/transition/timed/resume");
+        QTest::qWait(80);
+        QVERIFY(backend.positions.size() > paused);
+
+        // A cut takes over: the bar goes back to the start and nothing more is sent
+        send("/atem/transition/cut");
+        QCOMPARE(backend.positions.last(), 0.0f);
+        const int afterCut = backend.positions.size();
+        QTest::qWait(100);
+        QCOMPARE(backend.positions.size(), afterCut);
+        backend.positions.clear();
+
+        // The user takes the bar: the timed transition stops, the bar stays where the user put it
+        send("/atem/transition/timed/linear", 5.0f);
+        QTest::qWait(60);
+        send("/atem/transition/bar", 0.5f);
+        const int afterBar = backend.positions.size();
+        QCOMPARE(backend.positions.last(), 0.5f);
+        QTest::qWait(100);
+        QCOMPARE(backend.positions.size(), afterBar);
+
+        // Cancel, and a button release (0.0) starts nothing
+        send("/atem/transition/timed/linear", 5.0f);
+        QTest::qWait(60);
+        send("/atem/transition/timed/cancel");
+        QCOMPARE(backend.positions.last(), 0.0f);
+        backend.positions.clear();
+        send("/atem/transition/timed/linear", 0.0f);
+        QTest::qWait(60);
+        QVERIFY(backend.positions.isEmpty());
     }
 
     void testOscQueryRanges() {

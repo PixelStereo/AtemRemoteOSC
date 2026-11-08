@@ -341,6 +341,19 @@ void AddressRegistry::initStandardEndpoints() {
     registerEndpoint("/led/green", "Connection LED: 1.0 when connected", "float", "System", true);
     registerEndpoint("/led/red", "Connection LED: 1.0 when disconnected", "float", "System", true);
 
+    // Timed transitions: any length, the T-bar is moved by the application
+    registerEndpoint("/me/<me>/transition/timed", "Transition of N seconds driven by the T-bar (0.1 to 600 s), ease-in-out unless a curve is given as second argument", "float", "Transitions", false);
+    registerEndpoint("/me/<me>/transition/timed/linear", "Timed transition of N seconds, constant speed", "float", "Transitions", false);
+    registerEndpoint("/me/<me>/transition/timed/ease-in", "Timed transition of N seconds, slow start", "float", "Transitions", false);
+    registerEndpoint("/me/<me>/transition/timed/ease-out", "Timed transition of N seconds, slow end", "float", "Transitions", false);
+    registerEndpoint("/me/<me>/transition/timed/ease-in-out", "Timed transition of N seconds, slow start and end", "float", "Transitions", false);
+    registerEndpoint("/me/<me>/transition/timed/stop", "Stop the timed transition, the T-bar stays where it is", "none", "Transitions", false);
+    registerEndpoint("/me/<me>/transition/timed/cancel", "Cancel the timed transition, the T-bar goes back to the start", "none", "Transitions", false);
+    registerEndpoint("/me/<me>/transition/timed/pause", "Pause the timed transition", "none", "Transitions", false);
+    registerEndpoint("/me/<me>/transition/timed/resume", "Resume the paused timed transition", "none", "Transitions", false);
+    registerEndpoint("/me/<me>/transition/timed/state", "Timed transition state feedback (idle, running, paused)", "string", "Transitions", true);
+    registerEndpoint("/me/<me>/transition/timed/progress", "Timed transition progress feedback (0.0 to 1.0)", "float", "Transitions", true);
+
     // Aux & Converted Video Mode
     registerEndpoint("/aux/<number>", "Set input source for Aux output <number>", "int", "Aux", true);
     registerEndpoint("/aux/<number>/converted-videomode", "Set converted video mode on Aux output (SDK 11.0)", "int", "Aux", true);
@@ -353,6 +366,10 @@ void AddressRegistry::initStandardEndpoints() {
     for (const char *p : {"bar", "position"}) setRange(QStringLiteral("/me/<me>/transition/") + QLatin1String(p), 0.0, 1.0);
     for (const char *p : {"rate", "mix/rate", "dip/rate", "wipe/rate", "dve/rate"}) setRange(QStringLiteral("/me/<me>/transition/") + QLatin1String(p), 1.0, 250.0);
     setRange(dsk + QStringLiteral("rate"), 1.0, 250.0);
+    for (const char *p : {"", "/linear", "/ease-in", "/ease-out", "/ease-in-out"}) {
+        setRange(QStringLiteral("/me/<me>/transition/timed") + QLatin1String(p), 0.1, 600.0);
+    }
+    setRange(QStringLiteral("/me/<me>/transition/timed/progress"), 0.0, 1.0);
     for (const char *p : {"luma/clip", "luma/gain", "chroma/gain", "chroma/y-suppress", "chroma/lift"}) setRange(usk + QLatin1String(p), 0.0, 1.0);
     setRange(usk + QStringLiteral("chroma/hue"), 0.0, 360.0);
     for (const QString &base : {usk + QStringLiteral("mask/"), dsk + QStringLiteral("mask/")}) {

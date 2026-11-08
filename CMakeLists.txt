@@ -25,6 +25,8 @@ set(SOURCES
     src/osc/OscAddressRegistry.cpp
     src/osc/OscDispatcher.h
     src/osc/OscDispatcher.cpp
+    src/osc/TimedTransition.h
+    src/osc/TimedTransition.cpp
     src/osc/OscQueryTree.h
     src/osc/OscQueryTree.cpp
     src/osc/OscQueryServer.h
@@ -133,6 +135,8 @@ add_executable(test_osc
     src/osc/OscAddressRegistry.cpp
     src/osc/OscDispatcher.h
     src/osc/OscDispatcher.cpp
+    src/osc/TimedTransition.h
+    src/osc/TimedTransition.cpp
     src/osc/OscQueryTree.h
     src/osc/OscQueryTree.cpp
     src/osc/OscQueryServer.h
