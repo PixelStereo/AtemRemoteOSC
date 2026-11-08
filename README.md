@@ -37,7 +37,7 @@ The OSC address scheme of 4.2 is **kept**, so existing TouchOSC / Open Stage Con
  - **More keyer control**: advanced chroma sample, mask top/bottom/left/right on USK and DSK, full SuperSource box crop and border.
  - **Converted video modes** on aux outputs and stills capture (SDK 11.0).
  - **Complete feedback**: every value above is reported, on change and on request.
- - **Timed transitions** of any length (up to an hour), with easing, driven through the T-bar.
+ - **Timed transitions** of any length (up to an hour), with easing, driven through the T-bar; and the usual `rate` / `auto` / `ftb` addresses go beyond 250 frames the same way.
  - **OSCQuery**: the address space and its values over HTTP, announced on the network (mDNS), so compatible controllers discover AtemRemoteOsc by themselves.
  - **Partial updates**: changing one parameter of a group (EQ band, mask, clock layout, PTZ...) no longer resets the others.
  - **Connection that does not freeze the window**: it runs in the background, with 5 attempts 2 seconds apart like the original; a connection that was established and then lost is re-established by itself, one that never answered is not retried for ever.
@@ -57,7 +57,7 @@ There is no Linux support, since the SDK does not exist there; the code still bu
 ## Current limitations
 
  - This rewrite is **young**. It compiles and its tests pass on macOS, but it has **not been validated against a real switcher yet**. The Windows build compiles in CI but has never been run on a real machine. Please report problems.
- - The switcher's own fade to black and downstream-keyer auto transitions are still limited to 250 frames (10 s at 25 fps); only the M/E transitions can be made longer (see timed transitions).
+ - Downstream-keyer auto transitions are still limited to 250 frames (10 s at 25 fps). A fade to black above that is a mix to Black (see above).
  - Not implemented yet: USK DVE border parameters, fly rate, `audio/output/balance`, DVE and stinger transition parameters, Fairlight and HyperDeck feedback.
  - Builds are not code-signed or notarized (macOS will show a Gatekeeper warning on first launch: right click, Open).
 
@@ -460,6 +460,18 @@ The switcher limits its own automatic transitions to 250 frames (10 s at 25 fps)
  - **Feedback** `/atem/transition/timed/state` (`idle`, `running`, `paused`) and `/atem/transition/timed/progress` (0.0 to 1.0), besides the usual T-bar position.
 
 Starting a new timed transition replaces the running one. A cut, an auto transition or a move of the T-bar sent through OSC takes over; the connection being lost stops it. The computer running AtemRemoteOsc has to stay on and connected during the transition: if it stops, the T-bar stays where it was (the switcher does not finish by itself, unlike with its own automatic transition). A move of the physical T-bar on the switcher is not detected.
+
+### Durations above 250 frames: same addresses (new)
+
+The switcher accepts at most 250 frames (10 s at 25 fps) for its automatic transitions and its fade to black. With the usual addresses, AtemRemoteOsc takes over above that:
+
+ - **Set the duration in frames, as before**: `/atem/transition/rate`, `/atem/transition/mix/rate`, `/dip/rate`, `/wipe/rate`, `/dve/rate`, and the new `/atem/transition/ftb/rate` for the fade to black. Up to 250 the switcher keeps doing the work. Above 250 (for example `1500` = 60 s at 25 fps; the frame rate is read from the switcher's video mode) the value is remembered and the switcher is left at its maximum.
+ - **Start it as before**: `/atem/transition/auto` and `/atem/transition/ftb`. When the duration of the selected style is above 250 frames, the transition is moved through the T-bar by AtemRemoteOsc, with constant speed. The curve can be changed with `/atem/transition/curve <linear|ease-in|ease-out|ease-in-out>` (default `linear`, like the switcher's own transitions).
+ - **Same rules as timed transitions** (previous section): pause, resume, stop and cancel work, a cut or a T-bar move sent through OSC takes over, and the computer has to stay on and connected until the end. The feedback of the rate shows the real duration, not 250.
+
+**Fade to black above 250 frames is not exactly a fade to black.** The switcher offers no manual control of it, so AtemRemoteOsc does a mix to the Black source (input 0) through the T-bar, then restores the style and puts the old program in preview. Pressed again, it mixes back to that program. The consequence: downstream keyers stay visible during and after it, while a real fade to black takes them down too, and the program bus shows Black instead of the switcher's fade-to-black state (the `ftb` feedback does say it is black). The background has to be part of the next transition, which is the default.
+
+**Downstream keyers** (`/atem/dsk/$i/rate`) stay limited to 250 frames: they have no manual control to drive.
 
 ### Camera Control & PTZ (new)
 

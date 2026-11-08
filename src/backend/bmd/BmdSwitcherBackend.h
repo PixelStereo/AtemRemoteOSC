@@ -56,6 +56,8 @@ public:
     void setTransitionStyle(int me, Atem::TransitionStyle style) override;
     void setTransitionRate(int me, Atem::TransitionStyle style, float rateFrames) override;
     void setPreviewTransition(int me, bool preview) override;
+    void setFadeToBlackRate(int me, int frames) override;
+    double frameRate() const override;
 
     // USK
     void setUskOnAir(int me, int keyer, bool onAir) override;

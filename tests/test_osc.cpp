@@ -31,6 +31,16 @@ public:
     void setDisplayClockLayout(float s, float x, float y, float o) override {
         calls << QString("clock %1 %2 %3 %4").arg(s).arg(x).arg(y).arg(o);
     }
+    QMap<int, Atem::MeState> meMap;
+    const QMap<int, Atem::MeState>& meBlocks() const override { return meMap; }
+    double frameRate() const override { return 1000.0; } // so that a few hundred frames last a fraction of a second
+    QStringList log;
+    void setTransitionStyle(int me, Atem::TransitionStyle s) override { log << QString("style %1").arg(int(s)); Q_UNUSED(me); }
+    void setPreviewInput(int me, int64_t id) override { log << QString("preview %1").arg(id); Q_UNUSED(me); }
+    void performAutoTransition(int) override { log << "auto"; }
+    void performFadeToBlack(int) override { log << "ftb"; }
+    void setFadeToBlackRate(int, int frames) override { log << QString("ftbrate %1").arg(frames); }
+    void setTransitionRate(int, Atem::TransitionStyle, float frames) override { log << QString("rate %1").arg(frames); }
     QVector<float> positions;
     void setTransitionPosition(int, float p) override { positions << p; }
     void setMultiViewLayout(int mv, Atem::MultiViewLayout l) override { calls << QString("layout %1 %2").arg(mv).arg(int(l)); }
@@ -307,6 +317,82 @@ private slots:
         send("/atem/transition/timed/linear", 0.0f);
         QTest::qWait(60);
         QVERIFY(backend.positions.isEmpty());
+    }
+
+    void testLongTransitionsKeepTheSameAddresses() {
+        Osc::AddressRegistry registry;
+        Osc::Dispatcher dispatcher(&registry);
+        RecordingBackend backend;
+        Osc::Client client;
+        dispatcher.addSwitcher("", &backend, &client);
+        Atem::MeState me;
+        me.index = 1;
+        me.programInput = 3;
+        me.previewInput = 5;
+        me.transitionStyle = Atem::TransitionStyle::Wipe;
+        backend.meMap[1] = me;
+        auto send = [&](const QString &addr, auto... args) {
+            Osc::Message m(addr);
+            (addArg(m, args), ...);
+            dispatcher.dispatchMessage(m, QHostAddress::LocalHost, 1);
+        };
+
+        // Up to 250 frames: the switcher's own transition
+        send("/atem/transition/rate", 100.0f);
+        send("/atem/transition/auto");
+        QCOMPARE(backend.log, (QStringList{"rate 100", "auto"}));
+        QVERIFY(backend.positions.isEmpty());
+        backend.log.clear();
+
+        // Above: the switcher is given its maximum and the application drives the T-bar (300 frames = 0.3 s here)
+        send("/atem/transition/rate", 300.0f);
+        send("/atem/transition/auto");
+        QCOMPARE(backend.log, (QStringList{"rate 250"}));
+        QTest::qWait(450);
+        QVERIFY(backend.positions.size() > 5);
+        QCOMPARE(backend.positions.last(), 1.0f);
+        QVERIFY(backend.positions.at(backend.positions.size() / 2) < 0.9f); // progressive
+        backend.positions.clear();
+        backend.log.clear();
+
+        // Back to a short duration: the switcher's own again
+        send("/atem/transition/rate", 50.0f);
+        send("/atem/transition/auto");
+        QCOMPARE(backend.log, (QStringList{"rate 50", "auto"}));
+        backend.log.clear();
+
+        // Fade to black: within 250 frames, the switcher's
+        send("/atem/transition/ftb");
+        QCOMPARE(backend.log, QStringList{"ftb"});
+        backend.log.clear();
+
+        // Above: a mix to Black through the T-bar, then back to the program on the next press
+        send("/atem/transition/ftb/rate", 300.0f);
+        QCOMPARE(backend.log, QStringList{"ftbrate 250"});
+        backend.log.clear();
+        send("/atem/transition/ftb");
+        QCOMPARE(backend.log, (QStringList{"style 0", "preview 0"})); // mix, towards Black (input 0)
+        QTest::qWait(450);
+        QCOMPARE(backend.positions.last(), 1.0f);
+        QCOMPARE(backend.log, (QStringList{"style 0", "preview 0", "style 2", "preview 3"})); // style and old program restored
+        QVERIFY(!backend.log.contains("ftb"));
+        backend.positions.clear();
+        backend.log.clear();
+
+        send("/atem/transition/ftb"); // fade back in
+        QCOMPARE(backend.log, (QStringList{"style 0", "preview 3"}));
+        QTest::qWait(450);
+        QCOMPARE(backend.positions.last(), 1.0f);
+        QCOMPARE(backend.log.last(), QString("preview 5")); // the preview it had before
+        backend.positions.clear();
+        backend.log.clear();
+
+        // Pressed during the fade: abandoned, everything put back
+        send("/atem/transition/ftb");
+        QTest::qWait(60);
+        send("/atem/transition/ftb");
+        QCOMPARE(backend.positions.last(), 0.0f);
+        QCOMPARE(backend.log.last(), QString("preview 5"));
     }
 
     void testOscQueryRanges() {

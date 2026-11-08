@@ -6,6 +6,9 @@ namespace Osc {
 
 namespace {
 
+constexpr float kSwitcherMaxFrames = 250.0f; // longest duration the switcher accepts
+constexpr int kFtbKey = -1;                  // key of the fade to black in LongFade::frames
+
 // Returns the cached parameter group, creating it with `defaults` the first time.
 QVector<float>& group(SwitcherRoute &r, const QString &key, std::initializer_list<float> defaults) {
     auto it = r.params.find(key);
@@ -102,6 +105,8 @@ void Dispatcher::addSwitcher(const QString &nickname, Atem::IAtemBackend *backen
 }
 
 void Dispatcher::removeSwitcher(Atem::IAtemBackend *backend) {
+    for (auto it = m_long.begin(); it != m_long.end();) it = (it.key().first == backend) ? m_long.erase(it) : std::next(it);
+    for (auto it = m_endHandlers.begin(); it != m_endHandlers.end();) it = (it.key().first == backend) ? m_endHandlers.erase(it) : std::next(it);
     for (auto it = m_timed.begin(); it != m_timed.end();) {
         if (it.key().first == backend) {
             it.value()->stop();
@@ -372,8 +377,20 @@ bool Dispatcher::handleMe(SwitcherRoute &r, int me, const QString &sub, const Va
         return handleTimedTransition(r, me, sub.size() > prefixLength ? sub.mid(prefixLength) : QString(), arg);
     }
     if (sub == QLatin1String("transition/cut")) { stopTimedTransition(sw, me, true); sw->performCut(me); return true; }
-    if (sub == QLatin1String("transition/auto")) { stopTimedTransition(sw, me, true); sw->performAutoTransition(me); return true; }
-    if (sub == QLatin1String("transition/ftb")) { sw->performFadeToBlack(me); return true; }
+    if (sub == QLatin1String("transition/auto")) {
+        stopTimedTransition(sw, me, true);
+        if (!performLongAuto(r, me)) sw->performAutoTransition(me);
+        return true;
+    }
+    if (sub == QLatin1String("transition/ftb")) { performFadeToBlack(r, me); return true; }
+    if (sub == QLatin1String("transition/ftb/rate")) { setTransitionDuration(r, me, kFtbKey, arg.toFloat()); return true; }
+    if (sub == QLatin1String("transition/curve")) {
+        // Curve of the transitions the application drives itself (durations above 250 frames)
+        TimedTransition::Curve curve;
+        if (!TimedTransition::parseCurve(arg.toString(), curve)) return false;
+        m_long[qMakePair(sw, me)].curve = curve;
+        return true;
+    }
     if (sub == QLatin1String("transition/bar") || sub == QLatin1String("transition/position")) {
         stopTimedTransition(sw, me, false); // the user took the bar
         float pos = qBound(0.0f, arg.toFloat(), 1.0f);
@@ -392,13 +409,13 @@ bool Dispatcher::handleMe(SwitcherRoute &r, int me, const QString &sub, const Va
         return true;
     }
     if (sub == QLatin1String("transition/rate")) {
-        sw->setTransitionRate(me, sw->meBlocks().value(me).transitionStyle, arg.toFloat());
+        setTransitionDuration(r, me, static_cast<int>(sw->meBlocks().value(me).transitionStyle), arg.toFloat());
         return true;
     }
-    if (sub == QLatin1String("transition/mix/rate")) { sw->setTransitionRate(me, Atem::TransitionStyle::Mix, arg.toFloat()); return true; }
-    if (sub == QLatin1String("transition/dip/rate")) { sw->setTransitionRate(me, Atem::TransitionStyle::Dip, arg.toFloat()); return true; }
-    if (sub == QLatin1String("transition/wipe/rate")) { sw->setTransitionRate(me, Atem::TransitionStyle::Wipe, arg.toFloat()); return true; }
-    if (sub == QLatin1String("transition/dve/rate")) { sw->setTransitionRate(me, Atem::TransitionStyle::DVE, arg.toFloat()); return true; }
+    if (sub == QLatin1String("transition/mix/rate")) { setTransitionDuration(r, me, static_cast<int>(Atem::TransitionStyle::Mix), arg.toFloat()); return true; }
+    if (sub == QLatin1String("transition/dip/rate")) { setTransitionDuration(r, me, static_cast<int>(Atem::TransitionStyle::Dip), arg.toFloat()); return true; }
+    if (sub == QLatin1String("transition/wipe/rate")) { setTransitionDuration(r, me, static_cast<int>(Atem::TransitionStyle::Wipe), arg.toFloat()); return true; }
+    if (sub == QLatin1String("transition/dve/rate")) { setTransitionDuration(r, me, static_cast<int>(Atem::TransitionStyle::DVE), arg.toFloat()); return true; }
 
     static const QRegularExpression rxUsk("^usk/(\\d+)/(.+)$");
     auto matchUsk = rxUsk.match(sub);
@@ -440,6 +457,10 @@ TimedTransition* Dispatcher::timedTransition(Atem::IAtemBackend *backend, int me
 
     auto *tt = new TimedTransition(backend, me, this);
     m_timed.insert(key, tt);
+    connect(tt, &TimedTransition::finished, this, [this, key]() { endTimed(key, true); });
+    connect(tt, &TimedTransition::stateChanged, this, [this, key](TimedTransition::State s) {
+        if (s == TimedTransition::State::Idle) endTimed(key, false); // already consumed when it finished
+    });
     auto feedback = [this, backend, me](const QString &leaf, const Value &value) {
         sendFeedback(backend, QStringLiteral("/me/%1/transition/timed/%2").arg(me).arg(leaf), { value });
         if (me == 1) sendFeedback(backend, QStringLiteral("/transition/timed/%1").arg(leaf), { value });
@@ -451,6 +472,105 @@ TimedTransition* Dispatcher::timedTransition(Atem::IAtemBackend *backend, int me
         feedback(QStringLiteral("progress"), Value(static_cast<float>(p)));
     });
     return tt;
+}
+
+void Dispatcher::endTimed(const QPair<Atem::IAtemBackend*, int> &key, bool finished) {
+    auto it = m_endHandlers.find(key);
+    if (it == m_endHandlers.end()) return;
+    const std::function<void(bool)> handler = it.value();
+    m_endHandlers.erase(it);
+    if (handler) handler(finished);
+}
+
+void Dispatcher::startTimed(Atem::IAtemBackend *backend, int me, double seconds, TimedTransition::Curve curve,
+                            std::function<void(bool)> onEnd) {
+    TimedTransition *tt = timedTransition(backend, me);
+    tt->start(seconds, curve); // replacing a running one ends it first (and runs its handler)
+    if (onEnd) m_endHandlers.insert(qMakePair(backend, me), onEnd);
+}
+
+// A duration in frames, for a transition style or the fade to black. The switcher takes up to 250; beyond, the
+// duration is remembered and used when the transition is started.
+void Dispatcher::setTransitionDuration(SwitcherRoute &r, int me, int key, float frames) {
+    Atem::IAtemBackend *sw = r.backend;
+    LongFade &lf = m_long[qMakePair(sw, me)];
+    if (frames > kSwitcherMaxFrames) lf.frames[key] = frames;
+    else lf.frames.remove(key);
+    const float forSwitcher = qMin(frames, kSwitcherMaxFrames);
+
+    static const char *names[] = { "mix", "dip", "wipe", "dve", "sting" };
+    if (key == kFtbKey) {
+        sw->setFadeToBlackRate(me, qRound(forSwitcher));
+        sendFeedback(sw, QStringLiteral("/me/%1/transition/ftb/rate").arg(me), { Value(frames) });
+        return;
+    }
+    sw->setTransitionRate(me, static_cast<Atem::TransitionStyle>(key), forSwitcher);
+    if (key >= 0 && key < 5) {
+        sendFeedback(sw, QStringLiteral("/me/%1/transition/%2/rate").arg(me).arg(QLatin1String(names[key])), { Value(frames) });
+    }
+    if (key == static_cast<int>(sw->meBlocks().value(me).transitionStyle)) {
+        sendFeedback(sw, QStringLiteral("/me/%1/transition/rate").arg(me), { Value(frames) });
+    }
+}
+
+// transition/auto with a duration above 250 frames: the same transition, moved through the T-bar
+bool Dispatcher::performLongAuto(SwitcherRoute &r, int me) {
+    auto it = m_long.constFind(qMakePair(r.backend, me));
+    if (it == m_long.constEnd()) return false;
+    const float frames = it->frames.value(static_cast<int>(r.backend->meBlocks().value(me).transitionStyle), 0.0f);
+    if (frames <= kSwitcherMaxFrames) return false;
+    startTimed(r.backend, me, frames / r.backend->frameRate(), it->curve);
+    return true;
+}
+
+void Dispatcher::sendFtbFeedback(Atem::IAtemBackend *backend, int me, bool black) {
+    sendFeedback(backend, QStringLiteral("/me/%1/transition/ftb").arg(me), { Value(black) });
+    if (me == 1) sendFeedback(backend, QStringLiteral("/transition/ftb"), { Value(black) });
+}
+
+// Fade to black. Within 250 frames it is the switcher's own. Beyond, there is no manual control of it, so it is
+// done as a mix to the Black source (and back to the previous program when pressed again), driven through the
+// T-bar. The difference: downstream keyers stay visible, a real fade to black takes them down too.
+void Dispatcher::performFadeToBlack(SwitcherRoute &r, int me) {
+    Atem::IAtemBackend *sw = r.backend;
+    const auto key = qMakePair(sw, me);
+    LongFade &lf = m_long[key];
+
+    if (!lf.frames.contains(kFtbKey) && !lf.black && !lf.running) {
+        sw->performFadeToBlack(me);
+        return;
+    }
+    if (lf.running) { // pressed again during the fade: it is abandoned, the end handler puts things back
+        stopTimedTransition(sw, me, true);
+        return;
+    }
+
+    const float frames = lf.frames.value(kFtbKey, lf.lastFtbFrames > 0.0f ? lf.lastFtbFrames : kSwitcherMaxFrames);
+    lf.lastFtbFrames = frames;
+    const bool toBlack = !lf.black;
+    const Atem::MeState st = sw->meBlocks().value(me);
+    if (toBlack) {
+        lf.returnSource = st.programInput;
+        lf.savedPreview = st.previewInput;
+    }
+    lf.savedStyle = st.transitionStyle;
+    lf.running = true;
+
+    sw->setTransitionStyle(me, Atem::TransitionStyle::Mix);
+    sw->setPreviewInput(me, toBlack ? 0 : lf.returnSource); // input 0 is Black
+    startTimed(sw, me, frames / sw->frameRate(), lf.curve, [this, sw, me, key, toBlack](bool finished) {
+        LongFade &state = m_long[key];
+        state.running = false;
+        sw->setTransitionStyle(me, state.savedStyle);
+        if (toBlack && finished) {
+            sw->setPreviewInput(me, state.returnSource);
+            state.black = true;
+        } else {
+            sw->setPreviewInput(me, state.savedPreview);
+            if (!toBlack && finished) state.black = false;
+        }
+        sendFtbFeedback(sw, me, state.black);
+    });
 }
 
 void Dispatcher::stopTimedTransition(Atem::IAtemBackend *backend, int me, bool cancel) {
@@ -584,7 +704,11 @@ bool Dispatcher::handleDsk(SwitcherRoute &r, int key, const QString &sub, const 
     } else if (sub == QLatin1String("on-air/auto")) {
         sw->performDskAutoTransition(key);
     } else if (sub == QLatin1String("rate")) {
-        sw->setDskRate(key, arg.toInt());
+        // No manual control exists for a downstream keyer: it cannot be made longer than the switcher allows
+        if (arg.toInt() > kSwitcherMaxFrames) {
+            emit logMessage(QStringLiteral("DSK %1: the rate is limited to 250 frames by the switcher").arg(key));
+        }
+        sw->setDskRate(key, qMin(arg.toInt(), static_cast<int>(kSwitcherMaxFrames)));
     } else if (sub == QLatin1String("source/fill")) {
         sw->setDskFillSource(key, arg.toInt());
     } else if (sub == QLatin1String("source/cut")) {
@@ -857,11 +981,15 @@ void Dispatcher::onMeStateChanged(const Atem::MeState &state) {
     sendFeedback(backend, prefix + QStringLiteral("/program"), { Value(static_cast<int32_t>(state.programInput)) });
     sendFeedback(backend, prefix + QStringLiteral("/preview"), { Value(static_cast<int32_t>(state.previewInput)) });
     sendFeedback(backend, prefix + QStringLiteral("/transition/position"), { Value(state.transitionPosition) });
-    sendFeedback(backend, prefix + QStringLiteral("/transition/ftb"), { Value(state.ftbActive) });
+    const auto longIt = m_long.constFind(qMakePair(backend, state.index));
+    const bool fadedByUs = longIt != m_long.constEnd() && longIt->black;
+    sendFeedback(backend, prefix + QStringLiteral("/transition/ftb"), { Value(state.ftbActive || fadedByUs) });
     {
         static const char *styleNames[] = { "mix", "dip", "wipe", "dve", "sting", "mix" };
         sendFeedback(backend, prefix + QStringLiteral("/transition/type"), { Value(QString::fromLatin1(styleNames[static_cast<int>(state.transitionStyle)])) });
-        sendFeedback(backend, prefix + QStringLiteral("/transition/rate"), { Value(state.transitionRate) });
+        float rate = state.transitionRate;
+        if (longIt != m_long.constEnd()) rate = longIt->frames.value(static_cast<int>(state.transitionStyle), rate); // the duration above 250 frames
+        sendFeedback(backend, prefix + QStringLiteral("/transition/rate"), { Value(rate) });
         sendFeedback(backend, prefix + QStringLiteral("/transition/preview"), { Value(state.previewTransition) });
     }
     {

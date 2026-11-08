@@ -39,6 +39,7 @@ public:
     static QStringList curveNames();
 
 signals:
+    void finished(); // the bar reached the end (not emitted by stop / cancel)
     void stateChanged(TimedTransition::State state);
     void progressChanged(double progress);
 

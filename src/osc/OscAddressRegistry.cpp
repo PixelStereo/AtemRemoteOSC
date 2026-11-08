@@ -149,13 +149,15 @@ void AddressRegistry::initStandardEndpoints() {
     registerEndpoint("/me/<me>/transition/ftb", "Perform Fade To Black (FTB) on M/E <me>", "none", "Transitions", true);
     registerEndpoint("/me/<me>/transition/bar", "Set T-Bar position (0.0 to 1.0)", "float", "Transitions", true);
     registerEndpoint("/me/<me>/transition/position", "Set transition position (0.0 to 1.0)", "float", "Transitions", true);
+    registerEndpoint("/me/<me>/transition/ftb/rate", "Set the fade to black duration in frames (above 250, the application drives it as a mix to Black)", "float", "Transitions", true);
+    registerEndpoint("/me/<me>/transition/curve", "Curve of the transitions the application drives itself (durations above 250 frames)", "string", "Transitions", false);
     registerEndpoint("/me/<me>/transition/preview", "Toggle or set preview transition", "bool", "Transitions", true);
     registerEndpoint("/me/<me>/transition/type", "Set next transition style (mix, dip, wipe, sting, dve)", "string", "Transitions", true);
-    registerEndpoint("/me/<me>/transition/rate", "Set rate for current transition style in frames", "float", "Transitions", true);
-    registerEndpoint("/me/<me>/transition/mix/rate", "Set Mix transition rate in frames", "float", "Transitions", true);
-    registerEndpoint("/me/<me>/transition/dip/rate", "Set Dip transition rate in frames", "float", "Transitions", true);
-    registerEndpoint("/me/<me>/transition/wipe/rate", "Set Wipe transition rate in frames", "float", "Transitions", true);
-    registerEndpoint("/me/<me>/transition/dve/rate", "Set DVE transition rate in frames", "float", "Transitions", true);
+    registerEndpoint("/me/<me>/transition/rate", "Set rate for current transition style in frames (above 250 frames, the application drives the transition itself)", "float", "Transitions", true);
+    registerEndpoint("/me/<me>/transition/mix/rate", "Set Mix transition rate in frames (above 250 frames, the application drives the transition itself)", "float", "Transitions", true);
+    registerEndpoint("/me/<me>/transition/dip/rate", "Set Dip transition rate in frames (above 250 frames, the application drives the transition itself)", "float", "Transitions", true);
+    registerEndpoint("/me/<me>/transition/wipe/rate", "Set Wipe transition rate in frames (above 250 frames, the application drives the transition itself)", "float", "Transitions", true);
+    registerEndpoint("/me/<me>/transition/dve/rate", "Set DVE transition rate in frames (above 250 frames, the application drives the transition itself)", "float", "Transitions", true);
 
     // USK (Upstream Keyers)
     registerEndpoint("/me/<me>/usk/<key>/tie", "Set USK <key> Tie in next transition", "bool", "Upstream Keyers", true);
@@ -364,7 +366,7 @@ void AddressRegistry::initStandardEndpoints() {
     const QString in = QStringLiteral("/audio/input/<number>/");
     const QString cam = QStringLiteral("/camera/<id>/");
     for (const char *p : {"bar", "position"}) setRange(QStringLiteral("/me/<me>/transition/") + QLatin1String(p), 0.0, 1.0);
-    for (const char *p : {"rate", "mix/rate", "dip/rate", "wipe/rate", "dve/rate"}) setRange(QStringLiteral("/me/<me>/transition/") + QLatin1String(p), 1.0, 250.0);
+    for (const char *p : {"rate", "mix/rate", "dip/rate", "wipe/rate", "dve/rate", "ftb/rate"}) setRange(QStringLiteral("/me/<me>/transition/") + QLatin1String(p), 1.0, 9000.0);
     setRange(dsk + QStringLiteral("rate"), 1.0, 250.0);
     for (const char *p : {"", "/linear", "/ease-in", "/ease-out", "/ease-in-out"}) {
         setRange(QStringLiteral("/me/<me>/transition/timed") + QLatin1String(p), 0.1, 600.0);
@@ -396,6 +398,7 @@ void AddressRegistry::initStandardEndpoints() {
     setRange(QStringLiteral("/led/red"), 0.0, 1.0);
 
     setChoices(QStringLiteral("/me/<me>/transition/type"), {"mix", "dip", "wipe", "dve", "sting"});
+    setChoices(QStringLiteral("/me/<me>/transition/curve"), {"linear", "ease-in", "ease-out", "ease-in-out"});
     setChoices(usk + QStringLiteral("type"), {"luma", "chroma", "pattern", "dve"});
     setChoices(in + QStringLiteral("mix"), {"off", "on", "afv"});
     setChoices(QStringLiteral("/clock/mode"), {"timeofday", "countdown", "countup"});

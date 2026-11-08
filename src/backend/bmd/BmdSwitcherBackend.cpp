@@ -1084,6 +1084,40 @@ void BmdSwitcherBackend::setTransitionStyle(int me, Atem::TransitionStyle style)
     }
 }
 
+void BmdSwitcherBackend::setFadeToBlackRate(int me, int frames) {
+    if (me > 0 && me <= static_cast<int>(m_meBlocks.size())) {
+        m_meBlocks[me - 1]->SetFadeToBlackRate(static_cast<uint32_t>(qBound(1, frames, 250)));
+    }
+}
+
+double BmdSwitcherBackend::frameRate() const {
+    if (!m_switcher) return 25.0;
+    BMDSwitcherVideoMode mode = bmdSwitcherVideoModeUnknown;
+    if (FAILED(m_switcher->GetVideoMode(&mode))) return 25.0;
+    switch (mode) {
+        case bmdSwitcherVideoMode1080p2398: case bmdSwitcherVideoMode4KHDp2398: case bmdSwitcherVideoMode8KHDp2398:
+            return 24000.0 / 1001.0;
+        case bmdSwitcherVideoMode1080p24: case bmdSwitcherVideoMode4KHDp24: case bmdSwitcherVideoMode8KHDp24:
+            return 24.0;
+        case bmdSwitcherVideoMode625i50PAL: case bmdSwitcherVideoMode625i50Anamorphic: case bmdSwitcherVideoMode1080i50:
+        case bmdSwitcherVideoMode1080p25: case bmdSwitcherVideoMode4KHDp25: case bmdSwitcherVideoMode8KHDp25:
+            return 25.0; // interlaced modes count frames, two fields each
+        case bmdSwitcherVideoMode525i5994NTSC: case bmdSwitcherVideoMode525i5994Anamorphic: case bmdSwitcherVideoMode1080i5994:
+        case bmdSwitcherVideoMode1080p2997: case bmdSwitcherVideoMode4KHDp2997: case bmdSwitcherVideoMode8KHDp2997:
+            return 30000.0 / 1001.0;
+        case bmdSwitcherVideoMode1080i60: case bmdSwitcherVideoMode1080p30: case bmdSwitcherVideoMode4KHDp30: case bmdSwitcherVideoMode8KHDp30:
+            return 30.0;
+        case bmdSwitcherVideoMode720p50: case bmdSwitcherVideoMode1080p50: case bmdSwitcherVideoMode4KHDp50: case bmdSwitcherVideoMode8KHDp50:
+            return 50.0;
+        case bmdSwitcherVideoMode720p5994: case bmdSwitcherVideoMode1080p5994: case bmdSwitcherVideoMode4KHDp5994: case bmdSwitcherVideoMode8KHDp5994:
+            return 60000.0 / 1001.0;
+        case bmdSwitcherVideoMode720p60: case bmdSwitcherVideoMode1080p60: case bmdSwitcherVideoMode4KHDp60: case bmdSwitcherVideoMode8KHDp60:
+            return 60.0;
+        default:
+            return 25.0;
+    }
+}
+
 void BmdSwitcherBackend::setTransitionRate(int me, Atem::TransitionStyle style, float rateFrames) {
     if (me <= 0 || me > static_cast<int>(m_meBlocks.size())) return;
     auto *meBlock = m_meBlocks[me - 1];
