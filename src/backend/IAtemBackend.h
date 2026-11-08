@@ -38,6 +38,10 @@ public:
     virtual void setTransitionStyle(int me, TransitionStyle style) = 0;
     virtual void setTransitionRate(int me, TransitionStyle style, float rateFrames) = 0;
     virtual void setPreviewTransition(int me, bool preview) = 0;
+    // Fade to black duration, in frames (the switcher accepts up to 250)
+    virtual void setFadeToBlackRate(int /*me*/, int /*frames*/) {}
+    // Frame rate of the switcher's video mode, to turn a number of frames into seconds
+    virtual double frameRate() const { return 25.0; }
 
     // USK (Upstream Keyers)
     virtual void setUskOnAir(int me, int keyer, bool onAir) = 0;

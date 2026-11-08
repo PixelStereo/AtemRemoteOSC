@@ -80,6 +80,7 @@ void TimedTransition::tick()
     emit progressChanged(t);
     if (t >= 1.0) {
         m_timer.stop();
+        emit finished();
         setState(State::Idle); // the switcher completes the transition and resets its bar by itself
     }
 }

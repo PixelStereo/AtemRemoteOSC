@@ -12,6 +12,7 @@
 #include "OscAddressRegistry.h"
 #include "TimedTransition.h"
 #include <QPair>
+#include <functional>
 #include "../backend/IAtemBackend.h"
 
 namespace Osc {
@@ -77,6 +78,26 @@ private:
     bool handleTimedTransition(SwitcherRoute &route, int me, const QString &rest, const Value &arg);
     TimedTransition* timedTransition(Atem::IAtemBackend *backend, int me);
     void stopTimedTransition(Atem::IAtemBackend *backend, int me, bool cancel);
+
+    // The switcher stops at 250 frames for its automatic transitions and its fade to black. Above that, the
+    // duration is kept here and the application drives the fade itself, through the T-bar.
+    void setTransitionDuration(SwitcherRoute &route, int me, int key, float frames);
+    bool performLongAuto(SwitcherRoute &route, int me);
+    void performFadeToBlack(SwitcherRoute &route, int me);
+    void startTimed(Atem::IAtemBackend *backend, int me, double seconds, TimedTransition::Curve curve,
+                    std::function<void(bool)> onEnd = nullptr);
+    void sendFtbFeedback(Atem::IAtemBackend *backend, int me, bool black);
+
+    struct LongFade {
+        QHash<int, float> frames;     // duration above 250 frames, by transition style, or kFtbKey
+        TimedTransition::Curve curve = TimedTransition::Curve::Linear;
+        float lastFtbFrames = 0.0f;
+        bool black = false;           // faded to black by this application (a mix to the Black source)
+        bool running = false;         // such a fade is going on
+        int64_t returnSource = 0;
+        int64_t savedPreview = 0;
+        Atem::TransitionStyle savedStyle = Atem::TransitionStyle::Mix;
+    };
     bool handleUsk(SwitcherRoute &route, int me, int key, const QString &sub, const Value &arg);
     bool handleDsk(SwitcherRoute &route, int key, const QString &sub, const Value &arg);
     bool handleSuperSource(SwitcherRoute &route, const QString &sub, const Value &arg);
@@ -93,6 +114,9 @@ private:
     QList<SwitcherRoute> m_routes;
     QHash<QString, QVector<Value>> m_lastFeedback;
     QHash<QPair<Atem::IAtemBackend*, int>, TimedTransition*> m_timed;
+    QHash<QPair<Atem::IAtemBackend*, int>, LongFade> m_long;
+    QHash<QPair<Atem::IAtemBackend*, int>, std::function<void(bool)>> m_endHandlers;
+    void endTimed(const QPair<Atem::IAtemBackend*, int> &key, bool finished);
     Value m_arg1; // second argument of the message being dispatched
 };
 
