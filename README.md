@@ -10,7 +10,7 @@ atemOSC was created by [Daniel Büchele](https://github.com/danielbuechele) and 
 
 Peter Steffey has since moved atemOSC to a paid version 5. This fork starts from the open-source code of 4.2 and **changes course**: it is a complete rewrite in **C++17 / Qt 6** with CMake, kept free and open.
 
-To avoid any confusion with the original project and its version numbers, this fork has its own name, **AtemRemoteOsc**, and its own releases (currently **5.0.3**).
+To avoid any confusion with the original project and its version numbers, this fork has its own name, **AtemRemoteOsc**, and its own releases (see the [releases page](https://github.com/PixelStereo/AtemRemoteOSC/releases)).
 
 > **A word of thanks.** The aim of this project is not to belittle Peter Steffey's work, nor that of the other contributors. atemOSC exists, and is as good as it is, thanks to years of generous effort on their part, and everything here stands on the shoulders of that work. Anyone who wants the official, supported, actively developed atemOSC on macOS should go to [atemosc.com](https://www.atemosc.com) and support the original author. This fork simply offers a *different* alternative, with other priorities: cross-platform (macOS and Windows), free and open source, and a wider coverage of the Blackmagic SDK. Thank you, Peter, for all of it.
 
@@ -40,7 +40,7 @@ The OSC address scheme of 4.2 is **kept**, so existing TouchOSC / Open Stage Con
  - **Timed transitions** of any length (up to an hour), with easing, driven through the T-bar.
  - **OSCQuery**: the address space and its values over HTTP, announced on the network (mDNS), so compatible controllers discover AtemRemoteOsc by themselves.
  - **Partial updates**: changing one parameter of a group (EQ band, mask, clock layout, PTZ...) no longer resets the others.
- - **Auto reconnect**, connection on launch.
+ - **Connection that does not freeze the window**: it runs in the background, with 5 attempts 2 seconds apart like the original; a connection that was established and then lost is re-established by itself, one that never answered is not retried for ever.
  - **Robust OSC decoding**: malformed packets and deeply nested bundles are rejected instead of misparsed.
  - Unit tests (`ctest`) covering OSC encoding/decoding, the ATEM packet layer, address handling and parameter merging.
 
@@ -57,6 +57,7 @@ There is no Linux support, since the SDK does not exist there; the code still bu
 ## Current limitations
 
  - This rewrite is **young**. It compiles and its tests pass on macOS, but it has **not been validated against a real switcher yet**. The Windows build compiles in CI but has never been run on a real machine. Please report problems.
+ - The switcher's own fade to black and downstream-keyer auto transitions are still limited to 250 frames (10 s at 25 fps); only the M/E transitions can be made longer (see timed transitions).
  - Not implemented yet: USK DVE border parameters, fly rate, `audio/output/balance`, DVE and stinger transition parameters, Fairlight and HyperDeck feedback.
  - Builds are not code-signed or notarized (macOS will show a Gatekeeper warning on first launch: right click, Open).
 
@@ -74,7 +75,7 @@ The Blackmagic SDK 11.0 headers needed on macOS and Windows are included in `sdk
 
 Options: `--debug`, `--clean`, `--no-deps`, `--no-test`. On Windows, run it from Git Bash with Qt and Visual Studio installed and set `QT_DIR` (for example `QT_DIR=C:/Qt/6.10.3/msvc2022_64 ./build.sh --no-deps`).
 
-Manually: Qt 6.2+ (Core, Gui, Widgets, Network, Test), CMake 3.16+, a C++17 compiler.
+Manually: Qt 6.2+ (Core, Gui, Widgets, Network, Test; the releases are built with Qt 6.10), CMake 3.16+, a C++17 compiler.
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -84,7 +85,7 @@ ctest --test-dir build --output-on-failure
 
 ### Releasing
 
-Push a tag starting with `v` (for example `git tag v5.0.3 && git push origin v5.0.3`). The workflow in `.github/workflows/release.yml` builds, tests and packages the three platforms and publishes the GitHub release.
+Push a tag starting with `v` (for example `git tag v5.0.3 && git push origin v5.0.3`). The workflow in `.github/workflows/release.yml` builds, tests and packages macOS and Windows and publishes the GitHub release.
 
 ## Setup and Usage
 
