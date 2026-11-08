@@ -37,6 +37,7 @@ The OSC address scheme of 4.2 is **kept**, so existing TouchOSC / Open Stage Con
  - **More keyer control**: advanced chroma sample, mask top/bottom/left/right on USK and DSK, full SuperSource box crop and border.
  - **Converted video modes** on aux outputs and stills capture (SDK 11.0).
  - **Complete feedback**: every value above is reported, on change and on request.
+ - **Timed transitions** of any length (up to an hour), with easing, driven through the T-bar.
  - **OSCQuery**: the address space and its values over HTTP, announced on the network (mDNS), so compatible controllers discover AtemRemoteOsc by themselves.
  - **Partial updates**: changing one parameter of a group (EQ band, mask, clock layout, PTZ...) no longer resets the others.
  - **Auto reconnect**, connection on launch.
@@ -447,6 +448,17 @@ Feedback: Stream state sent to address `/atem/stream/state`, will contain a stri
      - Where `$i` is an integer value specifying the M/E to get the status of
      - This will query the switcher and send back the status for only program/preview, bar, and preview
   - This can be used when a new OSC client device is brought online, so that it gets the current status of the system
+
+### Timed transitions, up to any length (new)
+
+The switcher limits its own automatic transitions to 250 frames (10 s at 25 fps). AtemRemoteOsc can instead move the T-bar itself, from 0 to 1 in as many seconds as you want (0.1 s to 3600 s):
+
+ - **Start** `/atem/transition/timed <seconds> [curve]` (or `/atem/me/$i/transition/timed ...`). The curve is `linear`, `ease-in`, `ease-out` or `ease-in-out`; **without a curve, `ease-in-out` is used** (slow start, slow end).
+ - **Curve in the address** `/atem/transition/timed/linear <seconds>`, `/atem/transition/timed/ease-in <seconds>`, ... A value of `0` (a button release) starts nothing.
+ - **Control** `/atem/transition/timed/pause`, `/resume`, `/stop` (the T-bar stays where it is), `/cancel` (the T-bar goes back to the start).
+ - **Feedback** `/atem/transition/timed/state` (`idle`, `running`, `paused`) and `/atem/transition/timed/progress` (0.0 to 1.0), besides the usual T-bar position.
+
+Starting a new timed transition replaces the running one. A cut, an auto transition or a move of the T-bar sent through OSC takes over; the connection being lost stops it. The computer running AtemRemoteOsc has to stay on and connected during the transition: if it stops, the T-bar stays where it was (the switcher does not finish by itself, unlike with its own automatic transition). A move of the physical T-bar on the switcher is not detected.
 
 ### Camera Control & PTZ (new)
 

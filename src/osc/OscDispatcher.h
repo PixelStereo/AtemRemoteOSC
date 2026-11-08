@@ -10,6 +10,8 @@
 #include "OscServer.h"
 #include "OscClient.h"
 #include "OscAddressRegistry.h"
+#include "TimedTransition.h"
+#include <QPair>
 #include "../backend/IAtemBackend.h"
 
 namespace Osc {
@@ -72,6 +74,9 @@ private slots:
 private:
     bool handleCommand(SwitcherRoute &route, const QString &path, const Value &arg);
     bool handleMe(SwitcherRoute &route, int me, const QString &sub, const Value &arg);
+    bool handleTimedTransition(SwitcherRoute &route, int me, const QString &rest, const Value &arg);
+    TimedTransition* timedTransition(Atem::IAtemBackend *backend, int me);
+    void stopTimedTransition(Atem::IAtemBackend *backend, int me, bool cancel);
     bool handleUsk(SwitcherRoute &route, int me, int key, const QString &sub, const Value &arg);
     bool handleDsk(SwitcherRoute &route, int key, const QString &sub, const Value &arg);
     bool handleSuperSource(SwitcherRoute &route, const QString &sub, const Value &arg);
@@ -87,6 +92,8 @@ private:
     AddressRegistry *m_registry = nullptr;
     QList<SwitcherRoute> m_routes;
     QHash<QString, QVector<Value>> m_lastFeedback;
+    QHash<QPair<Atem::IAtemBackend*, int>, TimedTransition*> m_timed;
+    Value m_arg1; // second argument of the message being dispatched
 };
 
 } // namespace Osc

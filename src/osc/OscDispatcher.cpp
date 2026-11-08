@@ -102,6 +102,15 @@ void Dispatcher::addSwitcher(const QString &nickname, Atem::IAtemBackend *backen
 }
 
 void Dispatcher::removeSwitcher(Atem::IAtemBackend *backend) {
+    for (auto it = m_timed.begin(); it != m_timed.end();) {
+        if (it.key().first == backend) {
+            it.value()->stop();
+            delete it.value();
+            it = m_timed.erase(it);
+        } else {
+            ++it;
+        }
+    }
     for (int i = 0; i < m_routes.size(); ++i) {
         if (m_routes[i].backend == backend) {
             backend->disconnect(this);
@@ -200,6 +209,7 @@ void Dispatcher::dispatchMessage(const Osc::Message &message, const QHostAddress
     while (cmdPath.size() > 1 && cmdPath.endsWith('/')) cmdPath.chop(1);
 
     const Value arg0 = message.arg(0);
+    m_arg1 = message.arg(1);
     if (handleCommand(*targetRoute, cmdPath, arg0)) {
         return;
     }
@@ -357,16 +367,22 @@ bool Dispatcher::handleMe(SwitcherRoute &r, int me, const QString &sub, const Va
     if (sub == QLatin1String("program")) { sw->setProgramInput(me, arg.toInt()); return true; }
     if (sub == QLatin1String("preview")) { sw->setPreviewInput(me, arg.toInt()); return true; }
 
-    if (sub == QLatin1String("transition/cut")) { sw->performCut(me); return true; }
-    if (sub == QLatin1String("transition/auto")) { sw->performAutoTransition(me); return true; }
+    if (sub == QLatin1String("transition/timed") || sub.startsWith(QLatin1String("transition/timed/"))) {
+        static const int prefixLength = QStringLiteral("transition/timed/").size();
+        return handleTimedTransition(r, me, sub.size() > prefixLength ? sub.mid(prefixLength) : QString(), arg);
+    }
+    if (sub == QLatin1String("transition/cut")) { stopTimedTransition(sw, me, true); sw->performCut(me); return true; }
+    if (sub == QLatin1String("transition/auto")) { stopTimedTransition(sw, me, true); sw->performAutoTransition(me); return true; }
     if (sub == QLatin1String("transition/ftb")) { sw->performFadeToBlack(me); return true; }
     if (sub == QLatin1String("transition/bar") || sub == QLatin1String("transition/position")) {
+        stopTimedTransition(sw, me, false); // the user took the bar
         float pos = qBound(0.0f, arg.toFloat(), 1.0f);
         if (r.invertTBar) pos = 1.0f - pos;
         sw->setTransitionPosition(me, pos);
         return true;
     }
     if (sub == QLatin1String("transition/bar/reset")) {
+        stopTimedTransition(sw, me, false);
         sw->setTransitionPosition(me, 0.0f);
         return true;
     }
@@ -390,6 +406,58 @@ bool Dispatcher::handleMe(SwitcherRoute &r, int me, const QString &sub, const Va
         return handleUsk(r, me, matchUsk.captured(1).toInt(), matchUsk.captured(2), arg);
     }
     return false;
+}
+
+// /transition/timed <seconds> [curve], /transition/timed/<curve> <seconds>, /transition/timed/stop|cancel|pause|resume
+bool Dispatcher::handleTimedTransition(SwitcherRoute &r, int me, const QString &rest, const Value &arg) {
+    TimedTransition *tt = timedTransition(r.backend, me);
+    if (rest == QLatin1String("stop")) { tt->stop(); return true; }
+    if (rest == QLatin1String("cancel")) { tt->cancel(); return true; }
+    if (rest == QLatin1String("pause")) { tt->pause(); return true; }
+    if (rest == QLatin1String("resume")) { tt->resume(); return true; }
+
+    TimedTransition::Curve curve = TimedTransition::Curve::EaseInOut; // the default when none is given
+    if (!rest.isEmpty()) {
+        if (!TimedTransition::parseCurve(rest, curve)) return false;
+    } else if (m_arg1.isString() && !m_arg1.toString().isEmpty()) {
+        if (!TimedTransition::parseCurve(m_arg1.toString(), curve)) {
+            emit logMessage(QStringLiteral("Unknown transition curve \"%1\" (linear, ease-in, ease-out, ease-in-out)").arg(m_arg1.toString()));
+            return true;
+        }
+    }
+    const float seconds = arg.toFloat();
+    if (seconds <= 0.0f) return true; // 0.0 is a button release
+    if (seconds > TimedTransition::kMaxSeconds) {
+        emit logMessage(QStringLiteral("Transition time limited to %1 s").arg(TimedTransition::kMaxSeconds));
+    }
+    tt->start(seconds, curve);
+    return true;
+}
+
+TimedTransition* Dispatcher::timedTransition(Atem::IAtemBackend *backend, int me) {
+    const auto key = qMakePair(backend, me);
+    if (TimedTransition *existing = m_timed.value(key)) return existing;
+
+    auto *tt = new TimedTransition(backend, me, this);
+    m_timed.insert(key, tt);
+    auto feedback = [this, backend, me](const QString &leaf, const Value &value) {
+        sendFeedback(backend, QStringLiteral("/me/%1/transition/timed/%2").arg(me).arg(leaf), { value });
+        if (me == 1) sendFeedback(backend, QStringLiteral("/transition/timed/%1").arg(leaf), { value });
+    };
+    connect(tt, &TimedTransition::stateChanged, this, [feedback](TimedTransition::State s) {
+        feedback(QStringLiteral("state"), Value(TimedTransition::stateName(s)));
+    });
+    connect(tt, &TimedTransition::progressChanged, this, [feedback](double p) {
+        feedback(QStringLiteral("progress"), Value(static_cast<float>(p)));
+    });
+    return tt;
+}
+
+void Dispatcher::stopTimedTransition(Atem::IAtemBackend *backend, int me, bool cancel) {
+    TimedTransition *tt = m_timed.value(qMakePair(backend, me));
+    if (!tt) return;
+    if (cancel) tt->cancel();
+    else tt->stop();
 }
 
 bool Dispatcher::handleUsk(SwitcherRoute &r, int me, int key, const QString &sub, const Value &arg) {
@@ -770,6 +838,11 @@ void Dispatcher::onConnectionStateChanged(Atem::ConnectionState state) {
     if (!backend) return;
 
     const bool connected = (state == Atem::ConnectionState::Connected);
+    if (!connected) {
+        for (auto it = m_timed.begin(); it != m_timed.end(); ++it) {
+            if (it.key().first == backend) it.value()->stop(); // nothing left to drive
+        }
+    }
     sendFeedback(backend, connectionLedAddress(true), { Value(connected ? 1.0f : 0.0f) });
     sendFeedback(backend, connectionLedAddress(false), { Value(connected ? 0.0f : 1.0f) });
 }
