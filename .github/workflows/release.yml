@@ -41,7 +41,7 @@ jobs:
           arch: ${{ matrix.qt_arch }}
           cache: true
 
-      # A tag build is called "AtemRemoteOSC 5.0.6"; a manual build also carries its commit ("5.0.6 1a2b3c4")
+      # A tag build is called "AtemRemoteOSC 5.0.6"; a manual build also carries its commits since the release ("5.0.6+3")
       - name: Configure
         shell: bash
         run: |
@@ -83,7 +83,7 @@ jobs:
           & $compiler "/DPRODUCT=AtemRemoteOSC" "/DAPP_VERSION=$($app.version)" "/DAPP_EXE=$($app.executable)" "/DPAYLOAD=$PWD\dist\package" "/DOUTPUT=$setup" packaging/windows.nsi
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $clean = Join-Path $env:RUNNER_TEMP 'installed'
-          $installer = Start-Process -FilePath $setup -ArgumentList "/S /D=$clean" -Wait -PassThru
+          $installer = Start-Process -FilePath $setup -ArgumentList "/S /CurrentUser /D=$clean" -Wait -PassThru
           if ($installer.ExitCode) { throw "Installer failed: $($installer.ExitCode)" }
           if (!(Test-Path (Join-Path $clean "app/$($app.executable)"))) { throw 'The installed executable is missing' }
 
