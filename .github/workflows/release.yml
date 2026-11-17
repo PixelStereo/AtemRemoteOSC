@@ -22,11 +22,11 @@ jobs:
         include:
           - name: macOS
             os: macos-latest
-            asset: AtemRemoteOSC-macos-${{ github.ref_name }}.zip
+            asset: AtemRemoteOSC-macos-${{ github.ref_type == 'tag' && github.ref_name || github.sha }}.zip
           - name: Windows
             os: windows-latest
             qt_arch: win64_msvc2022_64
-            asset: AtemRemoteOSC-windows-${{ github.ref_name }}.zip
+            asset: AtemRemoteOSC-windows-${{ github.ref_type == 'tag' && github.ref_name || github.sha }}-Setup.exe
     steps:
       - uses: actions/checkout@v4
 
@@ -41,7 +41,7 @@ jobs:
           arch: ${{ matrix.qt_arch }}
           cache: true
 
-      # A tag build is called "AtemRemoteOSC 5.0.6"; a manual build also carries its commit ("5.0.6 1a2b3c4")
+      # A tag build is called "AtemRemoteOSC 5.0.6"; a manual build also carries its commits since the release ("5.0.6+3")
       - name: Configure
         shell: bash
         run: |
@@ -64,15 +64,35 @@ jobs:
         if: matrix.name == 'macOS'
         run: scripts/package-macos.sh build/application.json build "${{ matrix.asset }}"
 
+      # Windows: Qt deployed next to the executable, then a per-user NSIS installer (no administrator rights),
+      # installed silently on the runner and launched once before it is published
       - name: Package (Windows)
         if: matrix.name == 'Windows'
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $app = Get-Content build/application.json | ConvertFrom-Json
-          New-Item -ItemType Directory -Path "dist/$($app.name)" | Out-Null
-          Copy-Item "build/Release/$($app.executable)" "dist/$($app.name)/"
-          windeployqt --release --no-translations "dist/$($app.name)/$($app.executable)"
-          Compress-Archive -Path "dist/$($app.name)" -DestinationPath "${{ matrix.asset }}"
+          New-Item -ItemType Directory -Path dist/package -Force | Out-Null
+          Copy-Item "build/Release/$($app.executable)" dist/package/
+          windeployqt --release --no-translations --no-compiler-runtime "dist/package/$($app.executable)"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          # Nothing to install for the user: the Visual C++ runtime DLLs live next to the executable
+          $redist = if ($env:VCToolsRedistDir) { Join-Path $env:VCToolsRedistDir "x64" } else {
+            (Get-ChildItem "${env:ProgramFiles}/Microsoft Visual Studio/*/*/VC/Redist/MSVC/*/x64" -Directory | Sort-Object FullName | Select-Object -Last 1).FullName }
+          $crt = Get-ChildItem $redist -Directory -Filter "Microsoft.VC*.CRT" | Select-Object -First 1
+          if (!$crt) { throw "Microsoft Visual C++ runtime DLLs are missing from the build environment" }
+          Copy-Item (Join-Path $crt.FullName "*.dll") -Destination dist/package -Force
+          Get-ChildItem dist/package -Recurse -Filter "vc_redist*.exe" -ErrorAction SilentlyContinue | Remove-Item -Force
+          choco install nsis --yes --no-progress
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $compiler = Join-Path ${env:ProgramFiles(x86)} 'NSIS/makensis.exe'
+          $setup = Join-Path $PWD '${{ matrix.asset }}'
+          & $compiler "/DPRODUCT=AtemRemoteOSC" "/DAPP_VERSION=$($app.version)" "/DAPP_EXE=$($app.executable)" "/DPAYLOAD=$PWD\dist\package" "/DOUTPUT=$setup" packaging/windows.nsi
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $clean = Join-Path $env:RUNNER_TEMP 'installed'
+          $installer = Start-Process -FilePath $setup -ArgumentList "/S /CurrentUser /D=$clean" -Wait -PassThru
+          if ($installer.ExitCode) { throw "Installer failed: $($installer.ExitCode)" }
+          if (!(Test-Path (Join-Path $clean "app/$($app.executable)"))) { throw 'The installed executable is missing' }
 
       - uses: actions/upload-artifact@v4
         with:
