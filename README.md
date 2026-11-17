@@ -124,7 +124,7 @@ After launching the application, enter the IP address of the switcher, and which
 
 ## OSC API
 
-The full list of the OSC-addresses available for your switcher can be obtained by going to the "OSC Addresses" tab once you've connected AtemRemoteOsc to your switcher. The list below is just an overview of what the addresses may look like for a generic switcher.
+The full list of the OSC-addresses available for your switcher can be obtained by going to the "Addresses" tab once you've connected AtemRemoteOsc to your switcher. The list below is just an overview of what the addresses may look like for a generic switcher.
 
 All addresses must start with `/atem/`.  AtemRemoteOsc will ignore all OSC commands it receives whose address does not start with `/atem/`.
 
@@ -531,7 +531,7 @@ Several addresses map to one SDK call that takes all the parameters of a group (
 
 AtemRemoteOsc is also an [OSCQuery](https://github.com/Vidvox/OSCQueryProposal) server: it publishes the list of its OSC addresses, with their types and current values, over HTTP, and announces itself on the local network (mDNS / Bonjour, service `_oscjson._tcp`, plus `_osc._udp` for the OSC port). OSCQuery-aware software finds it and builds its interface by itself, without typing any address.
 
- - Enabled by default, on HTTP port `3334` (checkbox and port in the toolbar).
+ - Enabled by default, on HTTP port `3334` (switch and port in the Network tab).
  - `GET /` returns the whole tree, `GET /atem/me/1/program` one address, `GET /atem/me/1/program?VALUE` its current value (`TYPE`, `ACCESS`, `DESCRIPTION`, `FULL_PATH` work the same way), `GET /?HOST_INFO` the OSC port to send to.
  - The tree follows the connected switcher (number of M/Es, downstream keyers, aux outputs, HyperDecks, macros), and the values are those reported as feedback.
  - Parameters whose limits are known expose a `RANGE` (`MIN` / `MAX`), so controllers draw a slider, and parameters that take one of a few words (transition type, key type, audio mix, clock mode, MultiView layout) expose the accepted `VALS`. The limits come from the original atemOSC documentation and the Blackmagic SDK; the others are plain number fields.

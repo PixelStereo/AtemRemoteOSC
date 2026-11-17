@@ -1,17 +1,17 @@
 #pragma once
 
+#include <QDockWidget>
 #include <QMainWindow>
 #include <QSplitter>
 #include <QTabWidget>
-#include <QSpinBox>
-#include <QCheckBox>
-#include <QPushButton>
-#include <QLabel>
 #include "../app/AtemRemoteOscApp.h"
-#include "SwitcherListWidget.h"
 #include "ConnectionSettingsWidget.h"
-#include "OscAddressBrowserWidget.h"
 #include "LogConsoleWidget.h"
+#include "NetworkPanel.h"
+#include "OscAddressBrowserWidget.h"
+#include "SettingsPanel.h"
+#include "StatusLine.h"
+#include "SwitcherListWidget.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -19,35 +19,26 @@ public:
     explicit MainWindow(AtemRemoteOscApp *app, QWidget *parent = nullptr);
     ~MainWindow() override;
 
+    void showConsole(bool show);
+
 protected:
     void closeEvent(QCloseEvent *event) override;
 
-private slots:
-    void onSwitcherSelected(int index);
-    void onApplyPortClicked();
-    void onOscServerStateChanged(bool listening, quint16 port);
-    void onOscQueryChanged();
-
 private:
     void setupUi();
-    void updateServerStatusUi(bool listening, quint16 port);
-    void updateOscQueryStatus();
+    void setupMenus();
+    void updateSummary();
 
     AtemRemoteOscApp *m_app = nullptr;
 
-    QSplitter *m_mainSplitter = nullptr;
-    QSplitter *m_topSplitter = nullptr;
-
+    QSplitter *m_splitter = nullptr;
     SwitcherListWidget *m_switcherList = nullptr;
-    QTabWidget *m_tabWidget = nullptr;
+    QTabWidget *m_tabs = nullptr;
     ConnectionSettingsWidget *m_connectionWidget = nullptr;
+    NetworkPanel *m_network = nullptr;
     OscAddressBrowserWidget *m_addressBrowser = nullptr;
+    SettingsPanel *m_settings = nullptr;
+    QDockWidget *m_consoleDock = nullptr;
     LogConsoleWidget *m_logConsole = nullptr;
-
-    QSpinBox *m_spnIncomingPort = nullptr;
-    QPushButton *m_btnApplyPort = nullptr;
-    QLabel *m_lblServerStatus = nullptr;
-    QCheckBox *m_chkOscQuery = nullptr;
-    QSpinBox *m_spnOscQueryPort = nullptr;
-    QLabel *m_lblOscQueryStatus = nullptr;
+    StatusLine *m_status = nullptr;
 };
