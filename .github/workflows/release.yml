@@ -22,7 +22,7 @@ jobs:
         include:
           - name: macOS
             os: macos-latest
-            asset: AtemRemoteOSC-macos-${{ github.ref_name }}.dmg
+            asset: AtemRemoteOSC-macos-${{ github.ref_name }}.zip
           - name: Windows
             os: windows-latest
             qt_arch: win64_msvc2022_64
@@ -59,20 +59,20 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
 
+      # macOS: Qt deployed, everything signed ad hoc (without it the downloaded app is "damaged"), zipped with ditto
       - name: Package (macOS)
         if: matrix.name == 'macOS'
-        run: |
-          macdeployqt build/AtemRemoteOsc.app -dmg
-          mv build/AtemRemoteOsc.dmg "${{ matrix.asset }}"
+        run: scripts/package-macos.sh build/application.json build "${{ matrix.asset }}"
 
       - name: Package (Windows)
         if: matrix.name == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path dist/AtemRemoteOsc | Out-Null
-          Copy-Item build/Release/AtemRemoteOsc.exe dist/AtemRemoteOsc/
-          windeployqt --release --no-translations dist/AtemRemoteOsc/AtemRemoteOsc.exe
-          Compress-Archive -Path dist/AtemRemoteOsc -DestinationPath "${{ matrix.asset }}"
+          $app = Get-Content build/application.json | ConvertFrom-Json
+          New-Item -ItemType Directory -Path "dist/$($app.name)" | Out-Null
+          Copy-Item "build/Release/$($app.executable)" "dist/$($app.name)/"
+          windeployqt --release --no-translations "dist/$($app.name)/$($app.executable)"
+          Compress-Archive -Path "dist/$($app.name)" -DestinationPath "${{ matrix.asset }}"
 
       - uses: actions/upload-artifact@v4
         with:
