@@ -62,7 +62,7 @@ void MainWindow::showPage(int page)
 
 void MainWindow::setupUi()
 {
-    setWindowTitle(QStringLiteral("AtemRemoteOsc"));
+    setWindowTitle(QStringLiteral("AtemRemoteOSC ") + QApplication::applicationVersion());
     setMinimumSize(900, 520);
     resize(1180, 600); // wide and low: a control strip, not a document
 
@@ -146,7 +146,7 @@ void MainWindow::setupMenus()
                       [this, i] { showPage(i); });
 
     auto *help = menuBar()->addMenu(QStringLiteral("&Help"));
-    auto *about = help->addAction(QStringLiteral("About AtemRemoteOsc"), this, [this] { showAbout(this); });
+    auto *about = help->addAction(QStringLiteral("About AtemRemoteOSC"), this, [this] { showAbout(this); });
     about->setMenuRole(QAction::AboutRole);
 }
 
