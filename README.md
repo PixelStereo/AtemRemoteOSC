@@ -7,10 +7,7 @@
 From TouchOSC, Max, QLab, Companion or any OSC software. Every address answers back with its value, and OSCQuery clients find it by themselves.
 
 <!-- release-downloads:start -->
-**LATEST VERSION · [v5.0.6](https://github.com/PixelStereo/AtemRemoteOSC/releases/tag/v5.0.6)**
-
-[![macOS](https://img.shields.io/badge/macOS-Download-34CC34?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/PixelStereo/AtemRemoteOSC/releases/download/v5.0.6/AtemRemoteOSC-macos-v5.0.6.dmg)
-[![Windows](https://img.shields.io/badge/Windows-Download-CCCC34?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/PixelStereo/AtemRemoteOSC/releases/download/v5.0.6/AtemRemoteOSC-windows-v5.0.6.zip)
+Downloads appear here after the first release: see the [releases page](https://github.com/PixelStereo/AtemRemoteOSC/releases).
 <!-- release-downloads:end -->
 
 </div>
