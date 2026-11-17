@@ -63,7 +63,7 @@ There is no Linux support, since the SDK does not exist there; the code still bu
 
 ## Download
 
-Prebuilt macOS and Windows (`.zip`) packages are attached to each release on the [releases page](https://github.com/PixelStereo/AtemRemoteOsc/releases).
+Prebuilt packages (a macOS `.zip`, a Windows `-Setup.exe` installer) are attached to each release on the [releases page](https://github.com/PixelStereo/AtemRemoteOsc/releases).
 
 ## Build from source
 
