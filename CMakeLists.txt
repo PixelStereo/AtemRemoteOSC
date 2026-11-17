@@ -1,5 +1,26 @@
 cmake_minimum_required(VERSION 3.16)
-project(AtemRemoteOsc VERSION 5.0.5 LANGUAGES C CXX)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION")
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" atem_version LIMIT_COUNT 1)
+if(DEFINED ATEMREMOTEOSC_TAG_VERSION)
+    set(atem_version "${ATEMREMOTEOSC_TAG_VERSION}") # a release build: the number of the tag
+endif()
+project(AtemRemoteOsc VERSION "${atem_version}" LANGUAGES C CXX)
+
+# A release build is called "5.0.6"; any other build also carries the commit it was built from ("5.0.6 1a2b3c4")
+set(ATEM_DISPLAY_VERSION "${PROJECT_VERSION}")
+if(NOT DEFINED ATEMREMOTEOSC_TAG_VERSION AND NOT ATEMREMOTEOSC_RELEASE_BUILD)
+    execute_process(COMMAND git rev-parse --short=7 HEAD WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE atem_commit OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(atem_commit MATCHES "^[0-9a-f]+$")
+        string(APPEND ATEM_DISPLAY_VERSION " ${atem_commit}")
+    endif()
+    # Reconfigure when the commit changes
+    execute_process(COMMAND git rev-parse --path-format=absolute --git-path HEAD WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE atem_head OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    if(EXISTS "${atem_head}")
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${atem_head}")
+    endif()
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -101,7 +122,7 @@ elseif(WIN32)
 endif()
 
 add_executable(AtemRemoteOsc ${SOURCES})
-target_compile_definitions(AtemRemoteOsc PRIVATE ATEMREMOTEOSC_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(AtemRemoteOsc PRIVATE ATEMREMOTEOSC_VERSION="${ATEM_DISPLAY_VERSION}")
 
 # Seen by moc too (unlike the compiler's own platform macros): the SDK backend only exists on macOS and Windows
 if(APPLE OR WIN32)

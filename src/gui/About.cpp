@@ -22,12 +22,12 @@ const Credit credits[] = {
 void showAbout(QWidget *parent)
 {
     QDialog dialog(parent);
-    dialog.setWindowTitle(QStringLiteral("About AtemRemoteOsc"));
+    dialog.setWindowTitle(QStringLiteral("About AtemRemoteOSC"));
     auto *layout = new QVBoxLayout(&dialog);
     layout->setSpacing(10);
 
     auto *title = new QLabel(QStringLiteral(
-        "<h2 style='margin:0'>AtemRemoteOsc</h2><p style='margin:2px 0'>OSC control of ATEM switchers · %1</p>"
+        "<h2 style='margin:0'>AtemRemoteOSC %1</h2><p style='margin:2px 0'>OSC control of ATEM switchers</p>"
         "<p style='margin:6px 0 0'>Drive a Blackmagic ATEM from any OSC controller: every address answers with its value, "
         "and OSCQuery clients find it by themselves.<br>Built by <a href=\"https://pixelstereo.com\">Pixel Stereo</a>.</p>")
                                  .arg(QApplication::applicationVersion()));
