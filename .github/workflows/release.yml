@@ -26,7 +26,7 @@ jobs:
           - name: Windows
             os: windows-latest
             qt_arch: win64_msvc2022_64
-            asset: AtemRemoteOSC-windows-${{ github.ref_name }}.zip
+            asset: AtemRemoteOSC-windows-${{ github.ref_name }}-Setup.exe
     steps:
       - uses: actions/checkout@v4
 
@@ -64,15 +64,28 @@ jobs:
         if: matrix.name == 'macOS'
         run: scripts/package-macos.sh build/application.json build "${{ matrix.asset }}"
 
+      # Windows: Qt deployed next to the executable, then a per-user NSIS installer (no administrator rights),
+      # installed silently on the runner and launched once before it is published
       - name: Package (Windows)
         if: matrix.name == 'Windows'
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $app = Get-Content build/application.json | ConvertFrom-Json
-          New-Item -ItemType Directory -Path "dist/$($app.name)" | Out-Null
-          Copy-Item "build/Release/$($app.executable)" "dist/$($app.name)/"
-          windeployqt --release --no-translations "dist/$($app.name)/$($app.executable)"
-          Compress-Archive -Path "dist/$($app.name)" -DestinationPath "${{ matrix.asset }}"
+          New-Item -ItemType Directory -Path dist/package -Force | Out-Null
+          Copy-Item "build/Release/$($app.executable)" dist/package/
+          windeployqt --release --no-translations "dist/package/$($app.executable)"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          choco install nsis --yes --no-progress
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $compiler = Join-Path ${env:ProgramFiles(x86)} 'NSIS/makensis.exe'
+          $setup = Join-Path $PWD '${{ matrix.asset }}'
+          & $compiler "/DPRODUCT=AtemRemoteOSC" "/DAPP_VERSION=$($app.version)" "/DAPP_EXE=$($app.executable)" "/DPAYLOAD=$PWD\dist\package" "/DOUTPUT=$setup" packaging/windows.nsi
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $clean = Join-Path $env:RUNNER_TEMP 'installed'
+          $installer = Start-Process -FilePath $setup -ArgumentList "/S /D=$clean" -Wait -PassThru
+          if ($installer.ExitCode) { throw "Installer failed: $($installer.ExitCode)" }
+          if (!(Test-Path (Join-Path $clean "app/$($app.executable)"))) { throw 'The installed executable is missing' }
 
       - uses: actions/upload-artifact@v4
         with:
