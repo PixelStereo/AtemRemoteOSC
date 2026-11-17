@@ -124,9 +124,12 @@ if [ "$RUN_TESTS" -eq 1 ]; then
     ctest --test-dir "$BUILD_DIR" -C "$BUILD_TYPE" --output-on-failure
 fi
 
+# The application is called "AtemRemoteOSC <version>" (plus the commit for a build): CMake writes the exact name
+APP_NAME="$(sed -n 's/.*"name":"\([^"]*\)".*/\1/p' "$BUILD_DIR/application.json" 2>/dev/null)"
+APP_NAME="${APP_NAME:-AtemRemoteOSC}"
 case "$OS" in
-    Darwin) OUT="$BUILD_DIR/AtemRemoteOsc.app" ;;
-    MINGW*|MSYS*|CYGWIN*) OUT="$BUILD_DIR/$BUILD_TYPE/AtemRemoteOsc.exe" ;;
-    *) OUT="$BUILD_DIR/AtemRemoteOsc" ;;
+    Darwin) OUT="$BUILD_DIR/$APP_NAME.app" ;;
+    MINGW*|MSYS*|CYGWIN*) OUT="$BUILD_DIR/$BUILD_TYPE/$APP_NAME.exe" ;;
+    *) OUT="$BUILD_DIR/$APP_NAME" ;;
 esac
 log "Done: $OUT"

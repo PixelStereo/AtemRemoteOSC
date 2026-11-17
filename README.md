@@ -27,7 +27,7 @@ From TouchOSC, Max, QLab, Companion or any OSC software. Every address answers b
 
 ## Quick start
 
-1. Download, open, add your switcher's IP address, press **Connect**.
+1. Download, open (on macOS, the first time: Control-click the app, **Open**), add your switcher's IP address, press **Connect**.
 2. Send OSC to the computer's address on UDP port **3333**, for example `/atem/me/1/transition/auto`.
 3. Receive the feedback on the port set in the app (53000 by default).
 

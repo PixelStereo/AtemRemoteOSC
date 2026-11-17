@@ -122,6 +122,13 @@ elseif(WIN32)
 endif()
 
 add_executable(AtemRemoteOsc ${SOURCES})
+
+# The application carries its version in its name, as NyxMap and ISFLab do: "AtemRemoteOSC 5.0.6", and for a build
+# that is not a release "AtemRemoteOSC 5.0.6 1a2b3c4" (the bundle, the executable and the folder have that name)
+set(ATEM_APP_NAME "AtemRemoteOSC ${ATEM_DISPLAY_VERSION}")
+set_target_properties(AtemRemoteOsc PROPERTIES OUTPUT_NAME "${ATEM_APP_NAME}")
+file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/application.json"
+    CONTENT "{\"name\":\"${ATEM_APP_NAME}\",\"version\":\"${ATEM_DISPLAY_VERSION}\",\"executable\":\"$<TARGET_FILE_NAME:AtemRemoteOsc>\"}\n")
 target_compile_definitions(AtemRemoteOsc PRIVATE ATEMREMOTEOSC_VERSION="${ATEM_DISPLAY_VERSION}")
 
 # Seen by moc too (unlike the compiler's own platform macros): the SDK backend only exists on macOS and Windows
@@ -140,7 +147,7 @@ if(APPLE)
     target_link_libraries(AtemRemoteOsc PRIVATE "-framework CoreFoundation")
     set_target_properties(AtemRemoteOsc PROPERTIES
         MACOSX_BUNDLE TRUE
-        MACOSX_BUNDLE_BUNDLE_NAME "AtemRemoteOsc"
+        MACOSX_BUNDLE_BUNDLE_NAME "${ATEM_APP_NAME}"
         MACOSX_BUNDLE_GUI_IDENTIFIER "com.pixelstereo.AtemRemoteOsc"
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"

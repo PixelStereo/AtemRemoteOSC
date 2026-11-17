@@ -5,9 +5,9 @@ from pathlib import Path
 import re
 import sys
 
-# Release files carry the tag, as in NyxMap and ISFLab: AtemRemoteOSC-macos-v5.0.6.dmg
+# Release files carry the tag, as in NyxMap and ISFLab: AtemRemoteOSC-macos-v5.0.6.zip
 ASSETS = {
-    "macOS": ("AtemRemoteOSC-macos-{tag}.dmg", "apple", "34CC34"),
+    "macOS": ("AtemRemoteOSC-macos-{tag}.zip", "apple", "34CC34"),
     "Windows": ("AtemRemoteOSC-windows-{tag}.zip", "windows", "CCCC34"),
 }
 START = "<!-- release-downloads:start -->"
