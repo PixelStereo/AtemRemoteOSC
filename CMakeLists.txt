@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(AtemRemoteOsc VERSION 5.0.3 LANGUAGES C CXX)
+project(AtemRemoteOsc VERSION 5.0.5 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -50,6 +50,14 @@ set(SOURCES
     src/gui/OscAddressBrowserWidget.cpp
     src/gui/LogConsoleWidget.h
     src/gui/LogConsoleWidget.cpp
+    src/gui/StatusLine.h
+    src/gui/StatusLine.cpp
+    src/gui/NetworkPanel.h
+    src/gui/NetworkPanel.cpp
+    src/gui/SettingsPanel.h
+    src/gui/SettingsPanel.cpp
+    src/gui/About.h
+    src/gui/About.cpp
 )
 
 set(BMD_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/sdk/Blackmagic ATEM Switchers SDK 11.0")
@@ -93,6 +101,7 @@ elseif(WIN32)
 endif()
 
 add_executable(AtemRemoteOsc ${SOURCES})
+target_compile_definitions(AtemRemoteOsc PRIVATE ATEMREMOTEOSC_VERSION="${PROJECT_VERSION}")
 
 # Seen by moc too (unlike the compiler's own platform macros): the SDK backend only exists on macOS and Windows
 if(APPLE OR WIN32)

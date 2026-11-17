@@ -4,9 +4,11 @@
 #include <QString>
 
 class QApplication;
+class QPainter;
+class QRectF;
 
-// Dark interface in the style of NyxMap: Fusion, dark grey palette, one accent colour (very light grey by default)
-// used for the selection, the current tab and the buttons that are on.
+// The graphite interface shared with NyxMap and MpOsc: Fusion, dark neutral greys, one accent colour (very light grey
+// by default) for the selection, the current tab and what is on, square check boxes drawn by the theme.
 namespace theme {
 QColor defaultAccent();
 QColor accent();
@@ -15,4 +17,13 @@ QColor onAccent();               // text drawn on the accent: dark or light, whi
 QString css(int alpha = 255);    // "#rrggbb", or "rgba(r, g, b, a)" when alpha < 255
 QString tabStyle();
 void applyToApplication(QApplication &app); // palette and global stylesheet (called again on a change)
+
+// Colours of a state, the same everywhere (dots, pills, the status line)
+QColor okColor();
+QColor warnColor();
+QColor errorColor();
+QColor mutedColor();
+
+// A check box, as NyxMap draws them all: a rounded edge, the accent's square inside it when on
+void paintCheck(QPainter &p, const QRectF &box, bool on, bool hover, bool enabled);
 } // namespace theme

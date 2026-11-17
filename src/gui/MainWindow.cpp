@@ -1,168 +1,140 @@
 #include "MainWindow.h"
-#include <QVBoxLayout>
-#include <QHBoxLayout>
-#include <QToolBar>
-#include <QStatusBar>
-#include <QSettings>
+#include "About.h"
+#include <QAction>
 #include <QCloseEvent>
+#include <QMenuBar>
+#include <QSettings>
 
 MainWindow::MainWindow(AtemRemoteOscApp *app, QWidget *parent)
     : QMainWindow(parent)
     , m_app(app)
 {
     setupUi();
+    setupMenus();
 
     QSettings settings("AtemRemoteOsc", "AtemRemoteOsc");
     restoreGeometry(settings.value("mainWindowGeometry").toByteArray());
+    showConsole(settings.value("consoleVisible", true).toBool());
 
-    for (const auto &entry : m_app->logHistory()) {
-        m_logConsole->appendLogAt(entry.first, entry.second);
-    }
+    for (const auto &entry : m_app->logHistory()) m_logConsole->appendLogAt(entry.first, entry.second);
     connect(m_app, &AtemRemoteOscApp::logMessage, m_logConsole, &LogConsoleWidget::appendLog);
-    connect(m_app, &AtemRemoteOscApp::oscServerStateChanged, this, &MainWindow::onOscServerStateChanged);
 
     m_logConsole->setLogDebugOsc(m_app->logDebugOsc());
     connect(m_logConsole, &LogConsoleWidget::logDebugOscChanged, m_app, &AtemRemoteOscApp::setLogDebugOsc);
 
-    // Initial server state
-    updateServerStatusUi(m_app->isOscServerListening(), m_app->incomingPort());
+    connect(m_logConsole, &LogConsoleWidget::messageLogged, m_status, &StatusLine::setMessage);
+    connect(m_logConsole, &LogConsoleWidget::countsChanged, this, [this] {
+        m_status->setAlerts(m_logConsole->count(LogConsoleWidget::Error), m_logConsole->count(LogConsoleWidget::Warning));
+    });
+    connect(m_status, &StatusLine::alertsClicked, this, [this] { showConsole(true); });
 
-    // Select first switcher if available
-    if (!m_app->switchers().isEmpty()) {
-        m_connectionWidget->setSwitcherIndex(0);
-    }
+    for (auto signal : {&AtemRemoteOscApp::oscServerStateChanged, &AtemRemoteOscApp::oscQueryStateChanged})
+        connect(m_app, signal, this, [this](bool, quint16) { updateSummary(); });
+    connect(m_app, &AtemRemoteOscApp::switcherListChanged, this, &MainWindow::updateSummary);
+    connect(m_app, &AtemRemoteOscApp::switcherUpdated, this, &MainWindow::updateSummary);
+    m_status->setAlerts(m_logConsole->count(LogConsoleWidget::Error), m_logConsole->count(LogConsoleWidget::Warning));
+    updateSummary();
+
+    if (!m_app->switchers().isEmpty()) m_connectionWidget->setSwitcherIndex(0);
 }
 
-MainWindow::~MainWindow() {
-}
+MainWindow::~MainWindow() {}
 
-void MainWindow::closeEvent(QCloseEvent *event) {
+void MainWindow::closeEvent(QCloseEvent *event)
+{
     QSettings settings("AtemRemoteOsc", "AtemRemoteOsc");
     settings.setValue("mainWindowGeometry", saveGeometry());
+    settings.setValue("consoleVisible", m_consoleDock->isVisible());
     m_app->saveSettings();
     QMainWindow::closeEvent(event);
 }
 
-void MainWindow::setupUi() {
-    setWindowTitle(QStringLiteral("AtemRemoteOsc – ATEM Switcher OSC Proxy"));
-    setMinimumSize(900, 680);
-    resize(1040, 760);
+void MainWindow::showConsole(bool show) { m_consoleDock->setVisible(show); }
 
-    // 1. Toolbar for global Incoming OSC Port
-    auto *toolbar = addToolBar(QStringLiteral("OSC Server"));
-    toolbar->setMovable(false);
+void MainWindow::setupUi()
+{
+    setWindowTitle(QStringLiteral("AtemRemoteOsc"));
+    setMinimumSize(820, 560);
+    resize(1020, 720);
 
-    auto *portContainer = new QWidget(this);
-    auto *portLayout = new QHBoxLayout(portContainer);
-    portLayout->setContentsMargins(8, 4, 8, 4);
-    portLayout->setSpacing(8);
+    m_splitter = new QSplitter(Qt::Horizontal, this);
+    m_splitter->setChildrenCollapsible(false);
 
-    portLayout->addWidget(new QLabel(QStringLiteral("Incoming OSC Listening Port:"), this));
+    m_switcherList = new SwitcherListWidget(m_app, m_splitter);
+    m_switcherList->setMinimumWidth(220);
+    m_switcherList->setMaximumWidth(360);
 
-    m_spnIncomingPort = new QSpinBox(this);
-    m_spnIncomingPort->setRange(1024, 65535);
-    m_spnIncomingPort->setValue(m_app->incomingPort());
-    portLayout->addWidget(m_spnIncomingPort);
+    m_tabs = new QTabWidget(m_splitter);
+    m_tabs->setDocumentMode(false);
+    m_connectionWidget = new ConnectionSettingsWidget(m_app, m_tabs);
+    m_network = new NetworkPanel(m_app, m_tabs);
+    m_addressBrowser = new OscAddressBrowserWidget(m_app->addressRegistry(), m_tabs);
+    m_settings = new SettingsPanel(m_tabs);
+    m_tabs->addTab(m_connectionWidget, QStringLiteral("Switcher"));
+    m_tabs->addTab(m_network, QStringLiteral("Network"));
+    m_tabs->addTab(m_addressBrowser, QStringLiteral("Addresses"));
+    m_tabs->addTab(m_settings, QStringLiteral("Settings"));
 
-    m_btnApplyPort = new QPushButton(QStringLiteral("Restart Listener"), this);
-    portLayout->addWidget(m_btnApplyPort);
+    m_splitter->addWidget(m_switcherList);
+    m_splitter->addWidget(m_tabs);
+    m_splitter->setStretchFactor(0, 0);
+    m_splitter->setStretchFactor(1, 1);
+    m_splitter->setSizes({260, 760});
+    setCentralWidget(m_splitter);
 
-    m_lblServerStatus = new QLabel(this);
-    portLayout->addWidget(m_lblServerStatus);
+    m_consoleDock = new QDockWidget(QStringLiteral("Console"), this);
+    m_consoleDock->setObjectName(QStringLiteral("console"));
+    m_consoleDock->setFeatures(QDockWidget::DockWidgetClosable);
+    m_logConsole = new LogConsoleWidget(m_consoleDock);
+    m_consoleDock->setWidget(m_logConsole);
+    addDockWidget(Qt::BottomDockWidgetArea, m_consoleDock);
+    resizeDocks({m_consoleDock}, {170}, Qt::Vertical);
 
-    portLayout->addSpacing(16);
-    m_chkOscQuery = new QCheckBox(QStringLiteral("OSCQuery, HTTP port:"), this);
-    m_chkOscQuery->setToolTip(QStringLiteral("Publishes the OSC addresses and their values over HTTP and announces them on the network, "
-                                             "so that OSCQuery clients find AtemRemoteOsc by themselves."));
-    m_chkOscQuery->setChecked(m_app->oscQueryEnabled());
-    portLayout->addWidget(m_chkOscQuery);
-    m_spnOscQueryPort = new QSpinBox(this);
-    m_spnOscQueryPort->setRange(1024, 65535);
-    m_spnOscQueryPort->setValue(m_app->oscQueryPort());
-    portLayout->addWidget(m_spnOscQueryPort);
-    m_lblOscQueryStatus = new QLabel(this);
-    portLayout->addWidget(m_lblOscQueryStatus);
-    portLayout->addStretch();
+    m_status = new StatusLine(this);
+    setStatusBar(m_status);
 
-    toolbar->addWidget(portContainer);
-
-    // 2. Central Widget with Splitters
-    m_mainSplitter = new QSplitter(Qt::Vertical, this);
-
-    m_topSplitter = new QSplitter(Qt::Horizontal, m_mainSplitter);
-
-    // Left Panel: Switcher List
-    m_switcherList = new SwitcherListWidget(m_app, m_topSplitter);
-    m_switcherList->setMinimumWidth(200);
-    m_topSplitter->addWidget(m_switcherList);
-
-    // Right Panel: Tabs
-    m_tabWidget = new QTabWidget(m_topSplitter);
-
-    m_connectionWidget = new ConnectionSettingsWidget(m_app, m_tabWidget);
-    m_tabWidget->addTab(m_connectionWidget, QStringLiteral("Connection"));
-
-    m_addressBrowser = new OscAddressBrowserWidget(m_app->addressRegistry(), m_tabWidget);
-    m_tabWidget->addTab(m_addressBrowser, QStringLiteral("OSC Addresses"));
-
-    m_topSplitter->addWidget(m_tabWidget);
-    m_topSplitter->setStretchFactor(0, 1);
-    m_topSplitter->setStretchFactor(1, 3);
-
-    m_mainSplitter->addWidget(m_topSplitter);
-
-    // Bottom Panel: Log Console
-    m_logConsole = new LogConsoleWidget(m_mainSplitter);
-    m_mainSplitter->addWidget(m_logConsole);
-
-    m_mainSplitter->setStretchFactor(0, 3);
-    m_mainSplitter->setStretchFactor(1, 1);
-
-    setCentralWidget(m_mainSplitter);
-
-    // 3. Status Bar
-    statusBar()->showMessage(QStringLiteral("Ready"));
-
-    // Wire events
-    connect(m_switcherList, &SwitcherListWidget::selectionChanged, this, &MainWindow::onSwitcherSelected);
-    connect(m_btnApplyPort, &QPushButton::clicked, this, &MainWindow::onApplyPortClicked);
-    connect(m_chkOscQuery, &QCheckBox::toggled, this, &MainWindow::onOscQueryChanged);
-    connect(m_spnOscQueryPort, &QSpinBox::editingFinished, this, &MainWindow::onOscQueryChanged);
-    connect(m_app, &AtemRemoteOscApp::oscQueryStateChanged, this, [this](bool, quint16) { updateOscQueryStatus(); });
-    updateOscQueryStatus();
+    connect(m_switcherList, &SwitcherListWidget::selectionChanged, m_connectionWidget, &ConnectionSettingsWidget::setSwitcherIndex);
+    connect(m_connectionWidget, &ConnectionSettingsWidget::addRequested, m_switcherList, &SwitcherListWidget::addSwitcher);
 }
 
-void MainWindow::onSwitcherSelected(int index) {
-    m_connectionWidget->setSwitcherIndex(index);
+void MainWindow::setupMenus()
+{
+    auto *file = menuBar()->addMenu(QStringLiteral("&File"));
+    auto *add = file->addAction(QStringLiteral("Add a Switcher"), QKeySequence::New, m_switcherList, &SwitcherListWidget::addSwitcher);
+    add->setStatusTip(QStringLiteral("A new switcher; nothing connects until you press Connect"));
+    file->addSeparator();
+    auto *quit = file->addAction(QStringLiteral("Quit"), QKeySequence::Quit, this, &QWidget::close);
+    quit->setMenuRole(QAction::QuitRole);
+
+    auto *view = menuBar()->addMenu(QStringLiteral("&View"));
+    auto *console = m_consoleDock->toggleViewAction();
+    console->setText(QStringLiteral("Console"));
+    console->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_J));
+    view->addAction(console);
+
+    auto *help = menuBar()->addMenu(QStringLiteral("&Help"));
+    auto *about = help->addAction(QStringLiteral("About AtemRemoteOsc"), this, [this] { showAbout(this); });
+    about->setMenuRole(QAction::AboutRole);
 }
 
-void MainWindow::onApplyPortClicked() {
-    quint16 port = static_cast<quint16>(m_spnIncomingPort->value());
-    m_app->setIncomingPort(port);
-}
+void MainWindow::updateSummary()
+{
+    auto dot = [](const QColor &c) { return QStringLiteral("<font color='%1'>●</font> ").arg(c.name()); };
+    const QColor ok(0x5f, 0xc9, 0x7a), off(0x9a, 0x9a, 0xa3), bad(0xff, 0x8f, 0x82);
 
-void MainWindow::updateOscQueryStatus() {
-    if (m_app->isOscQueryRunning()) {
-        m_lblOscQueryStatus->setText(QStringLiteral("<font color='#2ecc71'>●</font> HTTP %1").arg(m_app->oscQueryPort()));
-    } else if (m_app->oscQueryEnabled()) {
-        m_lblOscQueryStatus->setText(QStringLiteral("<font color='#e74c3c'>●</font> port %1 busy?").arg(m_app->oscQueryPort()));
-    } else {
-        m_lblOscQueryStatus->setText(QStringLiteral("<font color='#9a9aa3'>●</font> off"));
-    }
-}
+    QString text;
+    text += dot(m_app->isOscServerListening() ? ok : bad)
+            + (m_app->isOscServerListening() ? QStringLiteral("OSC in, UDP %1").arg(m_app->incomingPort()) : QStringLiteral("OSC in off"));
+    text += QStringLiteral("&nbsp;&nbsp;&nbsp;");
+    text += dot(m_app->isOscQueryRunning() ? ok : (m_app->oscQueryEnabled() ? bad : off))
+            + (m_app->isOscQueryRunning() ? QStringLiteral("OSCQuery, HTTP %1").arg(m_app->oscQueryPort()) : QStringLiteral("OSCQuery off"));
 
-void MainWindow::onOscQueryChanged() {
-    m_app->setOscQuery(m_chkOscQuery->isChecked(), static_cast<quint16>(m_spnOscQueryPort->value()));
-}
-
-void MainWindow::onOscServerStateChanged(bool listening, quint16 port) {
-    updateServerStatusUi(listening, port);
-}
-
-void MainWindow::updateServerStatusUi(bool listening, quint16 port) {
-    if (listening) {
-        m_lblServerStatus->setText(QStringLiteral("<font color='#2ecc71'>●</font> <b>Listening on UDP %1</b>").arg(port));
-    } else {
-        m_lblServerStatus->setText(QStringLiteral("<font color='#e74c3c'>●</font> <b>Not Listening</b>"));
-    }
+    int connected = 0;
+    const auto &sw = m_app->switchers();
+    for (auto *s : sw)
+        if (s->backend && s->backend->connectionState() == Atem::ConnectionState::Connected) ++connected;
+    text += QStringLiteral("&nbsp;&nbsp;&nbsp;");
+    text += dot(connected > 0 ? ok : off)
+            + (sw.isEmpty() ? QStringLiteral("no switcher") : QStringLiteral("%1 of %2 switcher%3 connected").arg(connected).arg(sw.size()).arg(sw.size() > 1 ? "s" : ""));
+    m_status->setSummary(text);
 }
