@@ -29,6 +29,9 @@ jobs:
             asset: AtemRemoteOSC-windows-${{ github.ref_type == 'tag' && github.ref_name || github.sha }}-Setup.exe
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the tags: a manual build counts commits since the last release
+          submodules: true # third_party/pxs
 
       - name: Check the Blackmagic SDK headers are in the repository
         shell: bash
@@ -87,7 +90,7 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $compiler = Join-Path ${env:ProgramFiles(x86)} 'NSIS/makensis.exe'
           $setup = Join-Path $PWD '${{ matrix.asset }}'
-          & $compiler "/DPRODUCT=AtemRemoteOSC" "/DAPP_VERSION=$($app.version)" "/DAPP_EXE=$($app.executable)" "/DPAYLOAD=$PWD\dist\package" "/DOUTPUT=$setup" packaging/windows.nsi
+          & $compiler "/DPRODUCT=AtemRemoteOSC" "/DAPP_VERSION=$($app.version)" "/DAPP_EXE=$($app.executable)" "/DPAYLOAD=$PWD\dist\package" "/DOUTPUT=$setup" third_party/pxs/packaging/windows.nsi
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $clean = Join-Path $env:RUNNER_TEMP 'installed'
           $installer = Start-Process -FilePath $setup -ArgumentList "/S /CurrentUser /D=$clean" -Wait -PassThru
