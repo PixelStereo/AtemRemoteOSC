@@ -74,8 +74,15 @@ jobs:
           $app = Get-Content build/application.json | ConvertFrom-Json
           New-Item -ItemType Directory -Path dist/package -Force | Out-Null
           Copy-Item "build/Release/$($app.executable)" dist/package/
-          windeployqt --release --no-translations "dist/package/$($app.executable)"
+          windeployqt --release --no-translations --no-compiler-runtime "dist/package/$($app.executable)"
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          # Nothing to install for the user: the Visual C++ runtime DLLs live next to the executable
+          $redist = if ($env:VCToolsRedistDir) { Join-Path $env:VCToolsRedistDir "x64" } else {
+            (Get-ChildItem "${env:ProgramFiles}/Microsoft Visual Studio/*/*/VC/Redist/MSVC/*/x64" -Directory | Sort-Object FullName | Select-Object -Last 1).FullName }
+          $crt = Get-ChildItem $redist -Directory -Filter "Microsoft.VC*.CRT" | Select-Object -First 1
+          if (!$crt) { throw "Microsoft Visual C++ runtime DLLs are missing from the build environment" }
+          Copy-Item (Join-Path $crt.FullName "*.dll") -Destination dist/package -Force
+          Get-ChildItem dist/package -Recurse -Filter "vc_redist*.exe" -ErrorAction SilentlyContinue | Remove-Item -Force
           choco install nsis --yes --no-progress
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           $compiler = Join-Path ${env:ProgramFiles(x86)} 'NSIS/makensis.exe'
