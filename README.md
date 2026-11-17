@@ -46,3 +46,7 @@ Needs Qt 6, CMake and a C++17 compiler. The Blackmagic SDK headers are in `sdk/`
 AtemRemoteOSC grew from [atemOSC](https://github.com/SteffeyDev/atemOSC), created by Daniel Büchele and maintained for years by Peter Steffey and many contributors. It is not meant to belittle their work, only to offer a different alternative, rewritten in Qt. Peter now sells atemOSC 5 at [atemosc.com](https://www.atemosc.com): please support him.
 
 A young project: tell us what breaks. Built by [Pixel Stereo](https://pixelstereo.com).
+
+## License
+
+AGPL-3.0, see [LICENSE](LICENSE). The Blackmagic ATEM Switchers SDK headers in `sdk/` keep their own license notices.
