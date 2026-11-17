@@ -8,7 +8,7 @@ import sys
 # Release files carry the tag, as in NyxMap and ISFLab: AtemRemoteOSC-macos-v5.0.6.zip
 ASSETS = {
     "macOS": ("AtemRemoteOSC-macos-{tag}.zip", "apple", "34CC34"),
-    "Windows": ("AtemRemoteOSC-windows-{tag}.zip", "windows", "CCCC34"),
+    "Windows": ("AtemRemoteOSC-windows-{tag}-Setup.exe", "windows", "CCCC34"),
 }
 START = "<!-- release-downloads:start -->"
 END = "<!-- release-downloads:end -->"

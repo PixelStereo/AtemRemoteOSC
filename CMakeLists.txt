@@ -6,14 +6,17 @@ if(DEFINED ATEMREMOTEOSC_TAG_VERSION)
 endif()
 project(AtemRemoteOsc VERSION "${atem_version}" LANGUAGES C CXX)
 
-# A release build is called "5.0.6"; any other build also carries the commit it was built from ("5.0.6 1a2b3c4")
+# A release build is called "5.0.6"; any other build carries the commits since the release ("5.0.6+3") and a
+# trailing "+" for uncommitted changes ("5.0.6+3+")
 set(ATEM_DISPLAY_VERSION "${PROJECT_VERSION}")
 if(NOT DEFINED ATEMREMOTEOSC_TAG_VERSION AND NOT ATEMREMOTEOSC_RELEASE_BUILD)
-    execute_process(COMMAND git rev-parse --short=7 HEAD WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-        OUTPUT_VARIABLE atem_commit OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-    if(atem_commit MATCHES "^[0-9a-f]+$")
-        string(APPEND ATEM_DISPLAY_VERSION " ${atem_commit}")
+    include(cmake/PixelStereoBuildId.cmake)
+    pxs_nearest_release("${CMAKE_CURRENT_SOURCE_DIR}" atem_release)
+    if(NOT atem_release STREQUAL "")
+        set(ATEM_DISPLAY_VERSION "${atem_release}") # the tag the commits are counted from, even before VERSION catches up
     endif()
+    pxs_build_suffix("${CMAKE_CURRENT_SOURCE_DIR}" atem_suffix)
+    string(APPEND ATEM_DISPLAY_VERSION "${atem_suffix}")
     # Reconfigure when the commit changes
     execute_process(COMMAND git rev-parse --path-format=absolute --git-path HEAD WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         OUTPUT_VARIABLE atem_head OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
@@ -124,7 +127,7 @@ endif()
 add_executable(AtemRemoteOsc ${SOURCES})
 
 # The application carries its version in its name, as NyxMap and ISFLab do: "AtemRemoteOSC 5.0.6", and for a build
-# that is not a release "AtemRemoteOSC 5.0.6 1a2b3c4" (the bundle, the executable and the folder have that name)
+# that is not a release "AtemRemoteOSC 5.0.6+3" (the bundle, the executable and the folder have that name)
 set(ATEM_APP_NAME "AtemRemoteOSC ${ATEM_DISPLAY_VERSION}")
 set_target_properties(AtemRemoteOsc PROPERTIES OUTPUT_NAME "${ATEM_APP_NAME}")
 file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/application.json"
