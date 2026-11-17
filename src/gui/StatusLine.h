@@ -1,13 +1,13 @@
 #pragma once
 
-#include <QStatusBar>
+#include <QFrame>
 
 class QLabel;
 class QToolButton;
 
-// One line at the bottom: what is running (OSC input, OSCQuery, switchers), the last message, and a counter of
-// errors and warnings that opens the console.
-class StatusLine : public QStatusBar {
+// The bar across the top of the window: the name, what is running (OSC input, OSCQuery, switchers), the last
+// message, and a counter of errors and warnings that opens the log.
+class StatusLine : public QFrame {
     Q_OBJECT
 public:
     explicit StatusLine(QWidget *parent = nullptr);
@@ -18,9 +18,10 @@ public:
 
 signals:
     void alertsClicked();
+    void messageClicked();
 
 private:
     QLabel *m_summary = nullptr;
-    QLabel *m_message = nullptr;
+    QToolButton *m_message = nullptr;
     QToolButton *m_alerts = nullptr;
 };
