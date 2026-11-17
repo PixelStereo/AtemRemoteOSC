@@ -1,6 +1,7 @@
 #include "ConnectionSettingsWidget.h"
 #include <QFormLayout>
 #include <QGroupBox>
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QStyle>
 #include <QVBoxLayout>
@@ -36,76 +37,89 @@ ConnectionSettingsWidget::ConnectionSettingsWidget(AtemRemoteOscApp *app, QWidge
     m_stack->addWidget(empty);
     connect(btnAdd, &QPushButton::clicked, this, &ConnectionSettingsWidget::addRequested);
 
-    // Page 1: the switcher
+    // Page 1: the switcher. A hero line (model, state, one big button), then two columns of cards.
     auto *page = new QWidget(m_stack);
     auto *mainLayout = new QVBoxLayout(page);
-    mainLayout->setContentsMargins(16, 14, 16, 14);
-    mainLayout->setSpacing(12);
+    mainLayout->setContentsMargins(0, 18, 0, 0);
+    mainLayout->setSpacing(16);
 
-    auto *head = new QHBoxLayout;
-    m_lblSwitcherName = new QLabel(QStringLiteral("Switcher"), page);
-    m_lblSwitcherName->setObjectName(QStringLiteral("title"));
-    head->addWidget(m_lblSwitcherName);
-    head->addStretch();
-    m_lblPill = new QLabel(page);
+    auto *hero = new QFrame(page);
+    hero->setObjectName(QStringLiteral("hero"));
+    auto *heroRow = new QHBoxLayout(hero);
+    heroRow->setContentsMargins(20, 16, 20, 16);
+    heroRow->setSpacing(16);
+    auto *heroText = new QVBoxLayout;
+    heroText->setSpacing(6);
+    m_lblSwitcherName = new QLabel(QStringLiteral("Switcher"), hero);
+    m_lblSwitcherName->setObjectName(QStringLiteral("display"));
+    m_lblPill = new QLabel(hero);
     m_lblPill->setObjectName(QStringLiteral("pill"));
-    head->addWidget(m_lblPill);
-    mainLayout->addLayout(head);
+    heroText->addWidget(m_lblSwitcherName);
+    heroText->addWidget(m_lblPill, 0, Qt::AlignLeft);
+    heroRow->addLayout(heroText);
+    heroRow->addStretch();
+    m_btnToggle = new QPushButton(QStringLiteral("Connect"), hero);
+    m_btnToggle->setProperty("role", "go");
+    m_btnToggle->setObjectName(QStringLiteral("bigButton"));
+    m_btnToggle->setCursor(Qt::PointingHandCursor);
+    heroRow->addWidget(m_btnToggle);
+    mainLayout->addWidget(hero);
 
-    auto *grpConn = new QGroupBox(QStringLiteral("Switcher"), page);
+    auto *columns = new QHBoxLayout;
+    columns->setSpacing(16);
+
+    auto *grpConn = new QGroupBox(QStringLiteral("Address"), page);
     grpConn->setObjectName(QStringLiteral("section"));
-    auto *formConn = new QFormLayout(grpConn);
-    formConn->setLabelAlignment(Qt::AlignRight);
-
+    auto *connLayout = new QVBoxLayout(grpConn);
+    connLayout->setSpacing(6);
+    auto addField = [connLayout](const QString &caption, QWidget *w) {
+        auto *l = new QLabel(caption);
+        l->setObjectName(QStringLiteral("caption"));
+        connLayout->addWidget(l);
+        connLayout->addWidget(w);
+    };
     m_txtIp = new QLineEdit(grpConn);
-    m_txtIp->setPlaceholderText(QStringLiteral("IP address, e.g. 192.168.10.240"));
-    formConn->addRow(QStringLiteral("Address"), m_txtIp);
-
+    m_txtIp->setPlaceholderText(QStringLiteral("e.g. 192.168.10.240"));
+    addField(QStringLiteral("Switcher IP address"), m_txtIp);
     m_txtNickname = new QLineEdit(grpConn);
-    m_txtNickname->setPlaceholderText(QStringLiteral("Optional; needed to tell several switchers apart in OSC"));
-    formConn->addRow(QStringLiteral("OSC name"), m_txtNickname);
-
-    auto *btnRow = new QHBoxLayout;
-    m_btnConnect = new QPushButton(QStringLiteral("Connect"), grpConn);
-    m_btnConnect->setDefault(true);
-    m_btnConnect->setProperty("role", "go");
-    m_btnDisconnect = new QPushButton(QStringLiteral("Disconnect"), grpConn);
-    btnRow->addWidget(m_btnConnect);
-    btnRow->addWidget(m_btnDisconnect);
-    btnRow->addStretch();
-    formConn->addRow(QString(), btnRow);
-    mainLayout->addWidget(grpConn);
+    m_txtNickname->setPlaceholderText(QStringLiteral("optional, tells several switchers apart"));
+    addField(QStringLiteral("Name in OSC addresses"), m_txtNickname);
+    m_chkAutoReconnect = new QCheckBox(QStringLiteral("Connect on startup, and reconnect if the connection is lost"), grpConn);
+    connLayout->addSpacing(6);
+    connLayout->addWidget(m_chkAutoReconnect);
+    grpConn->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+    columns->addWidget(grpConn, 1);
 
     auto *grpOsc = new QGroupBox(QStringLiteral("OSC feedback"), page);
     grpOsc->setObjectName(QStringLiteral("section"));
-    auto *formOsc = new QFormLayout(grpOsc);
-    formOsc->setLabelAlignment(Qt::AlignRight);
-
+    auto *oscLayout = new QVBoxLayout(grpOsc);
+    oscLayout->setSpacing(6);
+    auto addOsc = [oscLayout](const QString &caption, QWidget *w) {
+        auto *l = new QLabel(caption);
+        l->setObjectName(QStringLiteral("caption"));
+        oscLayout->addWidget(l);
+        oscLayout->addWidget(w);
+    };
     m_txtOutgoingIp = new QLineEdit(grpOsc);
     m_txtOutgoingIp->setPlaceholderText(QStringLiteral("e.g. 127.0.0.1"));
-    formOsc->addRow(QStringLiteral("Send to"), m_txtOutgoingIp);
-
+    addOsc(QStringLiteral("Send values to"), m_txtOutgoingIp);
     m_spnOutgoingPort = new QSpinBox(grpOsc);
     m_spnOutgoingPort->setRange(1, 65535);
     m_spnOutgoingPort->setValue(53000);
-    formOsc->addRow(QStringLiteral("UDP port"), m_spnOutgoingPort);
-
+    addOsc(QStringLiteral("UDP port"), m_spnOutgoingPort);
     m_chkInvertTBar = new QCheckBox(QStringLiteral("Invert the T-bar values"), grpOsc);
-    formOsc->addRow(QString(), m_chkInvertTBar);
-    mainLayout->addWidget(grpOsc);
+    oscLayout->addSpacing(6);
+    oscLayout->addWidget(m_chkInvertTBar);
+    grpOsc->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+    columns->addWidget(grpOsc, 1);
 
-    auto *grpKeep = new QGroupBox(QStringLiteral("Connection"), page);
-    grpKeep->setObjectName(QStringLiteral("section"));
-    auto *keepLayout = new QVBoxLayout(grpKeep);
-    m_chkAutoReconnect = new QCheckBox(QStringLiteral("Connect on startup, and reconnect if the connection is lost"), grpKeep);
-    keepLayout->addWidget(m_chkAutoReconnect);
-    mainLayout->addWidget(grpKeep);
+    columns->setAlignment(Qt::AlignTop);
+    mainLayout->addLayout(columns);
     mainLayout->addStretch();
     m_stack->addWidget(page);
 
     // Wire signals
-    connect(m_btnConnect, &QPushButton::clicked, this, &ConnectionSettingsWidget::onConnectClicked);
-    connect(m_btnDisconnect, &QPushButton::clicked, this, &ConnectionSettingsWidget::onDisconnectClicked);
+    connect(m_btnToggle, &QPushButton::clicked, this, &ConnectionSettingsWidget::onToggleClicked);
 
     connect(m_txtIp, &QLineEdit::editingFinished, this, &ConnectionSettingsWidget::applySettings);
     connect(m_txtNickname, &QLineEdit::editingFinished, this, &ConnectionSettingsWidget::applySettings);
@@ -168,26 +182,29 @@ void ConnectionSettingsWidget::updateStatus()
     const QString model = sw->backend->switcherName();
     m_lblSwitcherName->setText(model.isEmpty() ? QStringLiteral("ATEM switcher") : model);
 
+    auto toggle = [this](const char *text, bool disconnect) {
+        m_btnToggle->setText(QString::fromLatin1(text));
+        m_btnToggle->setProperty("role", disconnect ? "stop" : "go");
+        m_btnToggle->style()->unpolish(m_btnToggle);
+        m_btnToggle->style()->polish(m_btnToggle);
+        m_wantsDisconnect = disconnect;
+    };
     switch (sw->backend->connectionState()) {
         case Atem::ConnectionState::Connected:
             setPill(QStringLiteral("Connected · %1").arg(sw->backend->backendName()), "ok");
-            m_btnConnect->setEnabled(false);
-            m_btnDisconnect->setEnabled(true);
+            toggle("Disconnect", true);
             break;
         case Atem::ConnectionState::Connecting:
             setPill(QStringLiteral("Connecting…"), "busy");
-            m_btnConnect->setEnabled(false);
-            m_btnDisconnect->setEnabled(true);
+            toggle("Cancel", true);
             break;
         case Atem::ConnectionState::Failed:
             setPill(QStringLiteral("Connection failed"), "bad");
-            m_btnConnect->setEnabled(true);
-            m_btnDisconnect->setEnabled(false);
+            toggle("Connect", false);
             break;
         default:
             setPill(QStringLiteral("Not connected"), "");
-            m_btnConnect->setEnabled(true);
-            m_btnDisconnect->setEnabled(false);
+            toggle("Connect", false);
             break;
     }
 }
@@ -208,13 +225,13 @@ void ConnectionSettingsWidget::applySettings()
     m_app->updateSwitcherConfig(m_currentIndex, cfg);
 }
 
-void ConnectionSettingsWidget::onConnectClicked()
+void ConnectionSettingsWidget::onToggleClicked()
 {
-    applySettings();
-    if (m_currentIndex >= 0) m_app->connectSwitcher(m_currentIndex);
-}
-
-void ConnectionSettingsWidget::onDisconnectClicked()
-{
-    if (m_currentIndex >= 0) m_app->disconnectSwitcher(m_currentIndex);
+    if (m_currentIndex < 0) return;
+    if (m_wantsDisconnect) {
+        m_app->disconnectSwitcher(m_currentIndex);
+    } else {
+        applySettings();
+        m_app->connectSwitcher(m_currentIndex);
+    }
 }

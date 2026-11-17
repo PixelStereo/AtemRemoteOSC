@@ -1,9 +1,8 @@
 #pragma once
 
-#include <QDockWidget>
+#include <QButtonGroup>
 #include <QMainWindow>
-#include <QSplitter>
-#include <QTabWidget>
+#include <QStackedWidget>
 #include "../app/AtemRemoteOscApp.h"
 #include "ConnectionSettingsWidget.h"
 #include "LogConsoleWidget.h"
@@ -13,13 +12,16 @@
 #include "StatusLine.h"
 #include "SwitcherListWidget.h"
 
+// A header bar across the top (what runs, the last message), a navigation rail on the left, and one page at a time:
+// Switchers, Network, Addresses, Log, Settings.
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
     explicit MainWindow(AtemRemoteOscApp *app, QWidget *parent = nullptr);
     ~MainWindow() override;
 
-    void showConsole(bool show);
+    enum Page { PageSwitchers, PageNetwork, PageAddresses, PageLog, PageSettings };
+    void showPage(int page);
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -31,14 +33,13 @@ private:
 
     AtemRemoteOscApp *m_app = nullptr;
 
-    QSplitter *m_splitter = nullptr;
+    QStackedWidget *m_pages = nullptr;
+    QButtonGroup m_nav;
     SwitcherListWidget *m_switcherList = nullptr;
-    QTabWidget *m_tabs = nullptr;
     ConnectionSettingsWidget *m_connectionWidget = nullptr;
     NetworkPanel *m_network = nullptr;
     OscAddressBrowserWidget *m_addressBrowser = nullptr;
-    SettingsPanel *m_settings = nullptr;
-    QDockWidget *m_consoleDock = nullptr;
     LogConsoleWidget *m_logConsole = nullptr;
+    SettingsPanel *m_settings = nullptr;
     StatusLine *m_status = nullptr;
 };

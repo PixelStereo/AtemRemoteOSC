@@ -21,14 +21,14 @@ signals:
     void addRequested(); // from the empty page
 
 private slots:
-    void onConnectClicked();
-    void onDisconnectClicked();
+    void onToggleClicked();
     void applySettings();
 
 private:
     void updateUiFromConfig();
     void updateStatus();
     void setPill(const QString &text, const char *state);
+    bool m_wantsDisconnect = false;
 
     AtemRemoteOscApp *m_app = nullptr;
     int m_currentIndex = -1;
@@ -38,8 +38,7 @@ private:
     QLabel *m_lblPill = nullptr;
     QLineEdit *m_txtIp = nullptr;
     QLineEdit *m_txtNickname = nullptr;
-    QPushButton *m_btnConnect = nullptr;
-    QPushButton *m_btnDisconnect = nullptr;
+    QPushButton *m_btnToggle = nullptr; // Connect, or Disconnect while connected or connecting
 
     QLineEdit *m_txtOutgoingIp = nullptr;
     QSpinBox *m_spnOutgoingPort = nullptr;
