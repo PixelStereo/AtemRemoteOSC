@@ -38,22 +38,6 @@ public:
     }
 };
 
-// Fusion, with the check boxes drawn by paintCheck
-class CheckStyle : public QProxyStyle {
-public:
-    using QProxyStyle::QProxyStyle;
-    void drawPrimitive(PrimitiveElement pe, const QStyleOption *o, QPainter *p, const QWidget *w = nullptr) const override
-    {
-        if (pe == PE_IndicatorCheckBox || pe == PE_IndicatorItemViewItemCheck) {
-            const QRectF r(o->rect);
-            const double side = std::min(r.width(), r.height());
-            const QRectF box(r.center().x() - side / 2, r.center().y() - side / 2, side, side);
-            paintCheck(*p, box, o->state & State_On, o->state & State_MouseOver, o->state & State_Enabled);
-            return;
-        }
-        QProxyStyle::drawPrimitive(pe, o, p, w);
-    }
-};
 } // namespace
 
 QColor defaultAccent() { return QColor(214, 214, 219); }
@@ -95,24 +79,6 @@ QColor warnColor() { return QColor(0xf2, 0xb8, 0x4b); }
 QColor errorColor() { return QColor(0xff, 0x8f, 0x82); }
 QColor mutedColor() { return QColor(0x9a, 0x9a, 0xa3); }
 
-void paintCheck(QPainter &p, const QRectF &box, bool on, bool hover, bool enabled)
-{
-    p.save();
-    p.setRenderHint(QPainter::Antialiasing);
-    QColor a = accent();
-    if (!enabled) a.setAlphaF(0.45f);
-    const QColor edge = !enabled ? QColor(80, 80, 86) : hover ? QColor(170, 170, 178) : QColor(120, 120, 128);
-    p.setPen(QPen(on ? a : edge, 1.2));
-    p.setBrush(QColor(24, 24, 27));
-    p.drawRoundedRect(box.adjusted(0.6, 0.6, -0.6, -0.6), 3, 3);
-    if (on) {
-        p.setPen(Qt::NoPen);
-        p.setBrush(a);
-        p.drawRoundedRect(box.adjusted(3.2, 3.2, -3.2, -3.2), 1.5, 1.5);
-    }
-    p.restore();
-}
-
 void applyToApplication(QApplication &app)
 {
     static bool filterInstalled = false;
@@ -120,7 +86,6 @@ void applyToApplication(QApplication &app)
         app.installEventFilter(new SoftSelection(&app));
         filterInstalled = true;
     }
-    app.setStyle(new CheckStyle(QStyleFactory::create(QStringLiteral("Fusion"))));
     // The graphite look shared by every Pixel Stereo application; the accent stays the one the user chose
     pxs::Palette palette = pxs::graphite();
     palette.link = accent();

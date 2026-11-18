@@ -23,6 +23,4 @@ QColor warnColor();
 QColor errorColor();
 QColor mutedColor();
 
-// A check box, as NyxMap draws them all: a rounded edge, the accent's square inside it when on
-void paintCheck(QPainter &p, const QRectF &box, bool on, bool hover, bool enabled);
 } // namespace theme
