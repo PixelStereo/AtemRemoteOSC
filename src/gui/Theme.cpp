@@ -8,6 +8,7 @@
 #include <QSettings>
 #include <QStyleFactory>
 #include <algorithm>
+#include <pxs/Theme.h>
 
 namespace theme {
 
@@ -37,22 +38,6 @@ public:
     }
 };
 
-// Fusion, with the check boxes drawn by paintCheck
-class CheckStyle : public QProxyStyle {
-public:
-    using QProxyStyle::QProxyStyle;
-    void drawPrimitive(PrimitiveElement pe, const QStyleOption *o, QPainter *p, const QWidget *w = nullptr) const override
-    {
-        if (pe == PE_IndicatorCheckBox || pe == PE_IndicatorItemViewItemCheck) {
-            const QRectF r(o->rect);
-            const double side = std::min(r.width(), r.height());
-            const QRectF box(r.center().x() - side / 2, r.center().y() - side / 2, side, side);
-            paintCheck(*p, box, o->state & State_On, o->state & State_MouseOver, o->state & State_Enabled);
-            return;
-        }
-        QProxyStyle::drawPrimitive(pe, o, p, w);
-    }
-};
 } // namespace
 
 QColor defaultAccent() { return QColor(214, 214, 219); }
@@ -94,37 +79,6 @@ QColor warnColor() { return QColor(0xf2, 0xb8, 0x4b); }
 QColor errorColor() { return QColor(0xff, 0x8f, 0x82); }
 QColor mutedColor() { return QColor(0x9a, 0x9a, 0xa3); }
 
-void paintCheck(QPainter &p, const QRectF &box, bool on, bool hover, bool enabled)
-{
-    p.save();
-    p.setRenderHint(QPainter::Antialiasing);
-    QColor a = accent();
-    if (!enabled) a.setAlphaF(0.45f);
-    const QColor edge = !enabled ? QColor(80, 80, 86) : hover ? QColor(170, 170, 178) : QColor(120, 120, 128);
-    p.setPen(QPen(on ? a : edge, 1.2));
-    p.setBrush(QColor(24, 24, 27));
-    p.drawRoundedRect(box.adjusted(0.6, 0.6, -0.6, -0.6), 3, 3);
-    if (on) {
-        p.setPen(Qt::NoPen);
-        p.setBrush(a);
-        p.drawRoundedRect(box.adjusted(3.2, 3.2, -3.2, -3.2), 1.5, 1.5);
-    }
-    p.restore();
-}
-
-QString tabStyle()
-{
-    return QStringLiteral("QTabBar::tab { background:#25252b; color:#c3c3cd; padding:6px 14px; margin-right:3px;"
-                          " font-weight:600; border:1px solid #62626e; border-bottom:3px solid #44444e;"
-                          " border-top-left-radius:4px; border-top-right-radius:4px; }"
-                          "QTabBar::tab:selected { background:#4c4c59; color:#ffffff; border-color:#9494a3;"
-                          " border-bottom:3px solid %1; }"
-                          "QTabBar::tab:hover:!selected { background:#383841; color:#ffffff; border-color:#9292a0; }"
-                          "QTabBar::tab:disabled { color:#777782; border-color:#44444e; }"
-                          "QTabWidget::pane { border:1px solid #62626e; }")
-        .arg(css());
-}
-
 void applyToApplication(QApplication &app)
 {
     static bool filterInstalled = false;
@@ -132,77 +86,60 @@ void applyToApplication(QApplication &app)
         app.installEventFilter(new SoftSelection(&app));
         filterInstalled = true;
     }
-    app.setStyle(new CheckStyle(QStyleFactory::create(QStringLiteral("Fusion"))));
-    QPalette p;
-    const QColor base(30, 30, 33), window(40, 40, 44), text(225, 225, 228), a = accent();
-    p.setColor(QPalette::Window, window);
-    p.setColor(QPalette::WindowText, text);
-    p.setColor(QPalette::Base, base);
-    p.setColor(QPalette::AlternateBase, window);
-    p.setColor(QPalette::ToolTipBase, base);
-    p.setColor(QPalette::ToolTipText, text);
-    p.setColor(QPalette::Text, text);
-    p.setColor(QPalette::Button, QColor(52, 52, 57));
-    p.setColor(QPalette::ButtonText, text);
-    p.setColor(QPalette::Highlight, a);
-    p.setColor(QPalette::HighlightedText, onAccent());
-    p.setColor(QPalette::Link, a);
-    p.setColor(QPalette::PlaceholderText, QColor(130, 130, 135));
-    p.setColor(QPalette::Disabled, QPalette::Text, QColor(120, 120, 125));
-    p.setColor(QPalette::Disabled, QPalette::ButtonText, QColor(120, 120, 125));
-    p.setColor(QPalette::Disabled, QPalette::WindowText, QColor(120, 120, 125));
-    app.setPalette(p);
-    app.setStyleSheet(tabStyle() + QStringLiteral(
+    // The graphite look shared by every Pixel Stereo application; the accent stays the one the user chose
+    pxs::Palette palette = pxs::graphite();
+    palette.link = accent();
+    pxs::apply(app, palette, QStringLiteral(
         // Cards: the grouped settings
-        "QGroupBox#section { border:1px solid #62626e; border-radius:6px; margin-top:12px; padding:14px 10px 10px 10px; }"
-        "QGroupBox#section::title { subcontrol-origin:margin; left:11px; padding:0 5px; color:#f2f2f3; font-weight:600; }"
-        "QLabel#caption { color:#9a9aa3; }"
-        "QLabel#title { font-size:15px; font-weight:600; color:#f2f2f3; }"
-        "QLabel#hint { color:#9a9aa3; }"
+        "QGroupBox#section { border:1px solid @border; border-radius:6px; margin-top:12px; padding:14px 10px 10px 10px; }"
+        "QGroupBox#section::title { subcontrol-origin:margin; left:11px; padding:0 5px; color:@text; font-weight:600; }"
+        "QLabel#caption { color:@muted; }"
+        "QLabel#title { font-size:15px; font-weight:600; color:@text; }"
+        "QLabel#hint { color:@muted; }"
         // A state, in words
-        "QLabel#pill { border:1px solid #62626e; border-radius:9px; padding:2px 10px; color:#c3c3cd; }"
-        "QLabel#pill[state=\"ok\"] { color:#5fc97a; border-color:#3b7a4c; background:#1d2c22; }"
-        "QLabel#pill[state=\"busy\"] { color:#f2b84b; border-color:#8a6a2a; background:#2f2616; }"
-        "QLabel#pill[state=\"bad\"] { color:#ff8f82; border-color:#8a3a32; background:#2f1a17; }"
+        "QLabel#pill { border:1px solid @border; border-radius:9px; padding:2px 10px; color:@muted; }"
+        "QLabel#pill[state=\"ok\"] { color:#5fc97a; border-color:#3b7a4c; background:@window; }"
+        "QLabel#pill[state=\"busy\"] { color:#f2b84b; border-color:#8a6a2a; background:@window; }"
+        "QLabel#pill[state=\"bad\"] { color:#ff8f82; border-color:#8a3a32; background:@window; }"
         // Header bar, rail, chips, hero: the window's own structure
-        "QFrame#header { background:#1c1c1f; border-bottom:1px solid #62626e; }"
-        "QFrame#rail { background:#1c1c1f; border-right:1px solid #62626e; }"
+        "QFrame#header { background:@base; border-bottom:1px solid @border; }"
+        "QFrame#rail { background:@base; border-right:1px solid @border; }"
         "QPushButton#nav { background:transparent; border:0; border-left:3px solid transparent; border-radius:0;"
-        " text-align:left; padding:10px 18px; color:#bdbdc6; font-size:14px; }"
-        "QPushButton#nav:hover { background:#2a2a2f; color:#ffffff; }"
-        "QPushButton#nav:checked { background:#2f2f35; color:#ffffff; font-weight:600; border-left:3px solid %1; }"
-        "QPushButton#chip { background:#2c2c31; border:1px solid #62626e; border-radius:15px; padding:6px 16px; color:#d0d0d6; }"
-        "QPushButton#chip:hover { border-color:#9a9aa3; color:#ffffff; }"
-        "QPushButton#chip:checked { background:#3d3d45; border:1px solid %1; color:#ffffff; font-weight:600; }"
-        "QPushButton#chip:disabled { color:#6c6c74; border-color:#44444e; }"
-        "QFrame#hero { background:#2c2c31; border:1px solid #62626e; border-radius:10px; }"
-        "QLabel#display { font-size:24px; font-weight:600; color:#f2f2f3; }"
+        " text-align:left; padding:10px 18px; color:@muted; font-size:14px; }"
+        "QPushButton#nav:hover { background:@button; color:@text; }"
+        "QPushButton#nav:checked { background:@button; color:@text; font-weight:600; border-left:3px solid @link; }"
+        "QPushButton#chip { background:@button; border:1px solid @border; border-radius:15px; padding:6px 16px; color:@text; }"
+        "QPushButton#chip:hover { border-color:@focus; color:@text; }"
+        "QPushButton#chip:checked { background:@midlight; border:1px solid @link; color:@text; font-weight:600; }"
+        "QPushButton#chip:disabled { color:@border; border-color:@midlight; }"
+        "QFrame#hero { background:@button; border:1px solid @border; border-radius:10px; }"
+        "QLabel#display { font-size:24px; font-weight:600; color:@text; }"
         "QPushButton#bigButton { min-width:150px; min-height:44px; font-size:15px; border-radius:22px; }"
-        "QPushButton[role=\"stop\"] { background:#4a2320; color:#f0f0f3; font-weight:bold; border:1px solid #9a4a42;"
+        "QPushButton[role=\"stop\"] { background:@button; color:@text; font-weight:bold; border:1px solid #9a4a42;"
         " border-radius:3px; padding:5px 14px; min-width:84px; }"
         "QPushButton[role=\"stop\"]:hover { background:#60302b; }"
         "QPushButton#bigButton[role=\"go\"], QPushButton#bigButton[role=\"stop\"] { border-radius:22px; }"
-        "QSplitter::handle { background:#62626e; margin:1px; }"
+        "QSplitter::handle { background:@fill; margin:1px; }"
         "QSplitter::handle:horizontal { width:5px; }"
         "QSplitter::handle:vertical { height:5px; }"
-        "QSplitter::handle:hover { background:%1; }"
-        "QHeaderView::section { background:#35353e; color:#e1e1e8; border:0; border-right:1px solid #555561;"
-        " border-bottom:1px solid #747480; padding:4px 6px; }"
-        "QMenu::separator { height:1px; background:#62626e; margin:5px 8px; }"
-        "QStatusBar { color:#a0a0aa; }"
+        "QSplitter::handle:hover { background:@link; }"
+        "QHeaderView::section { background:@midlight; color:@text; border:0; border-right:1px solid @border;"
+        " border-bottom:1px solid @border; padding:4px 6px; }"
+        "QMenu::separator { height:1px; background:@fill; margin:5px 8px; }"
+        "QStatusBar { color:@muted; }"
         "QStatusBar::item { border:0; }"
         "QDockWidget { font-weight:600; }"
-        "QDockWidget::title { background:#25252b; padding:5px 8px; border-bottom:1px solid #62626e; }"
+        "QDockWidget::title { background:@window; padding:5px 8px; border-bottom:1px solid @border; }"
         "QLineEdit, QSpinBox, QComboBox { border-radius:4px; padding:3px 6px; }"
         // A button that is on shows it: the accent, not Fusion's barely darker shade
-        "QPushButton:checked, QToolButton:checked { background:%1; color:%2; border:1px solid %1; border-radius:3px; }"
+        "QPushButton:checked, QToolButton:checked { background:@link; color:@window; border:1px solid @link; border-radius:3px; }"
         // The main action, like NyxMap's GO
-        "QPushButton[role=\"go\"] { background:#1f4a28; color:#f0f0f3; font-weight:bold; border:1px solid #3f9a52;"
+        "QPushButton[role=\"go\"] { background:@button; color:@text; font-weight:bold; border:1px solid #3f9a52;"
         " border-radius:3px; padding:5px 14px; min-width:84px; }"
         "QPushButton[role=\"go\"]:hover { background:#27603a; }"
-        "QPushButton[role=\"go\"]:disabled { background:#34343a; color:#78787f; border-color:#4a4a52; }"
-        "QPlainTextEdit { background:#171a28; color:#d6d9e6; border:1px solid #62626e; }")
-        .arg(css(), onAccent().name()));
+        "QPushButton[role=\"go\"]:disabled { background:@midlight; color:@border; border-color:@border; }"
+        "QPlainTextEdit { background:@base; color:@link; border:1px solid @border; }")
+        );
 }
 
 } // namespace theme

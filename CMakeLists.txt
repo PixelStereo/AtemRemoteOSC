@@ -33,6 +33,9 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
+# Shared Pixel Stereo code (the look), pinned as a submodule
+set(PXS_BUILD_TESTS OFF)
+add_subdirectory(third_party/pxs EXCLUDE_FROM_ALL)
 
 set(SOURCES
     src/main.cpp
@@ -144,6 +147,7 @@ target_link_libraries(AtemRemoteOsc PRIVATE
     Qt6::Gui
     Qt6::Widgets
     Qt6::Network
+    pxs::theme
 )
 
 if(APPLE)
