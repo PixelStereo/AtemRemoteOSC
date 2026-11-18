@@ -148,6 +148,7 @@ target_link_libraries(AtemRemoteOsc PRIVATE
     Qt6::Widgets
     Qt6::Network
     pxs::theme
+    pxs::tree
 )
 
 if(APPLE)
@@ -195,6 +196,7 @@ target_link_libraries(test_osc PRIVATE
     Qt6::Core
     Qt6::Network
     Qt6::Test
+    pxs::tree
 )
 add_test(NAME test_osc COMMAND test_osc)
 
