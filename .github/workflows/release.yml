@@ -16,6 +16,7 @@ jobs:
   build:
     name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.optional || false }}
     strategy:
       fail-fast: false
       matrix:
@@ -23,6 +24,11 @@ jobs:
           - name: macOS
             os: macos-latest
             asset: AtemRemoteOSC-macos-arm64-${{ github.ref_type == 'tag' && github.ref_name || github.sha }}.zip
+          # The Intel build is attached to the release when it passes; it does not block the release when it fails
+          - name: macOS Intel
+            os: macos-15-intel
+            optional: true
+            asset: AtemRemoteOSC-macos-x64-${{ github.ref_type == 'tag' && github.ref_name || github.sha }}.zip
           - name: Windows
             os: windows-latest
             qt_arch: win64_msvc2022_64
@@ -64,7 +70,7 @@ jobs:
 
       # macOS: Qt deployed, everything signed ad hoc (without it the downloaded app is "damaged"), zipped with ditto
       - name: Package (macOS)
-        if: matrix.name == 'macOS'
+        if: startsWith(matrix.name, 'macOS')
         run: scripts/package-macos.sh build/application.json build "${{ matrix.asset }}"
 
       # Windows: Qt deployed next to the executable, then a per-user NSIS installer (no administrator rights),
@@ -126,5 +132,5 @@ jobs:
     needs: release
     permissions:
       contents: write
-    uses: PixelStereo/pxs/.github/workflows/release-downloads.yml@v0.12.1
-    with: { app: AtemRemoteOSC, platforms: "mac,win", pxs-ref: v0.12.1 }
+    uses: PixelStereo/pxs/.github/workflows/release-downloads.yml@v0.15.0
+    with: { app: AtemRemoteOSC, platforms: "mac,win", pxs-ref: v0.15.0 }
