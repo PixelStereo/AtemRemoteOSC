@@ -18,7 +18,7 @@ QString typeTag(const QString &valueType)
     return QString();
 }
 
-QJsonValue toJson(const Value &v)
+QVariant toVariant(const Value &v)
 {
     switch (v.type()) {
         case Type::Int32: return v.toInt();
@@ -26,7 +26,7 @@ QJsonValue toJson(const Value &v)
         case Type::True: return true;
         case Type::False: return false;
         case Type::String: return v.toString();
-        default: return QJsonValue::Null;
+        default: return QVariant();
     }
 }
 
@@ -119,14 +119,16 @@ void QueryTree::rebuildIfNeeded()
     for (qint64 a : sorted) signature += QString::number(a) + QLatin1Char(',');
     signature += QString::number(m_registry->endpoints().size());
 
-    if (signature == m_signature && !m_leaves.isEmpty()) return;
+    if (signature == m_signature && !m_tree.root().children().empty()) return;
     m_signature = signature;
-    m_leaves.clear();
+    m_tree.clear();
+    m_tree.root().description = QStringLiteral("AtemRemoteOsc");
 
     if (backends.isEmpty()) {
         nicknames.append(QString());
         backends.append(nullptr);
     }
+    int leaves = 0;
     for (int i = 0; i < backends.size(); ++i) {
         Counts c;
         c.audioInputs = audio;
@@ -139,129 +141,56 @@ void QueryTree::rebuildIfNeeded()
         }
         const QString prefix = nicknames[i].isEmpty() ? QStringLiteral("/atem") : QStringLiteral("/atem/") + nicknames[i];
         for (const auto &ep : m_registry->endpoints()) {
-            Leaf leaf;
-            leaf.type = typeTag(ep.valueType);
-            leaf.feedback = ep.feedback;
-            leaf.description = ep.description;
-            leaf.hasRange = ep.hasRange;
-            leaf.rangeMin = ep.rangeMin;
-            leaf.rangeMax = ep.rangeMax;
-            leaf.choices = ep.choices;
+            const QString type = typeTag(ep.valueType);
+            QJsonArray range;
+            // One entry per argument: the interval of a number, or the accepted strings
+            if (ep.hasRange && (type == QLatin1String("f") || type == QLatin1String("i"))) {
+                range = QJsonArray{QJsonObject{{"MIN", ep.rangeMin}, {"MAX", ep.rangeMax}}};
+            } else if (!ep.choices.isEmpty() && type == QLatin1String("s")) {
+                range = QJsonArray{QJsonObject{{"VALS", QJsonArray::fromStringList(ep.choices)}}};
+            }
             const QStringList paths = expand(ep.pattern, c);
             const QStringList patternParts = ep.pattern.split('/');
             for (const QString &p : paths) {
-                if (m_leaves.size() >= kMaxLeaves) return;
+                if (++leaves > kMaxLeaves) return;
                 // "Set Program input for M/E <me>" -> "... M/E 1"
-                Leaf concrete = leaf;
+                QString description = ep.description;
                 const QStringList parts = p.split('/');
-                for (int i = 0; i < patternParts.size() && i < parts.size(); ++i) {
-                    if (patternParts[i].startsWith('<')) concrete.description.replace(patternParts[i], parts[i]);
+                for (int k = 0; k < patternParts.size() && k < parts.size(); ++k) {
+                    if (patternParts[k].startsWith('<')) description.replace(patternParts[k], parts[k]);
                 }
-                m_leaves.insert(prefix + p, concrete);
+                const QString full = prefix + p;
+                pxs::Node &node = m_tree.add(full);
+                node.description = description;
+                node.access = ep.feedback ? 3 : 2; // read/write, or write only
+                node.type = type;
+                if (!type.isEmpty()) {
+                    node.range = range;
+                    if (ep.feedback) {
+                        const Dispatcher *dispatcher = m_dispatcher;
+                        node.get = [dispatcher, full] {
+                            QVariantList values;
+                            for (const Value &v : dispatcher->lastFeedback(full)) values.append(toVariant(v));
+                            return values;
+                        };
+                    }
+                }
             }
         }
     }
-}
-
-bool QueryTree::hasChildren(const QString &path) const
-{
-    const QString prefix = path == QLatin1String("/") ? QStringLiteral("/") : path + QLatin1Char('/');
-    auto it = m_leaves.lowerBound(prefix);
-    return it != m_leaves.end() && it.key().startsWith(prefix);
-}
-
-QJsonObject QueryTree::leafJson(const QString &path, const Leaf &leaf) const
-{
-    QJsonObject o;
-    o["FULL_PATH"] = path;
-    o["ACCESS"] = leaf.feedback ? 3 : 2; // read/write, or write only
-    if (!leaf.description.isEmpty()) o["DESCRIPTION"] = leaf.description;
-    if (!leaf.type.isEmpty()) {
-        o["TYPE"] = leaf.type;
-        // One entry per argument: the interval of a number, or the accepted strings
-        if (leaf.hasRange && (leaf.type == QLatin1String("f") || leaf.type == QLatin1String("i"))) {
-            QJsonObject range;
-            range["MIN"] = leaf.rangeMin;
-            range["MAX"] = leaf.rangeMax;
-            o["RANGE"] = QJsonArray{range};
-        } else if (!leaf.choices.isEmpty() && leaf.type == QLatin1String("s")) {
-            QJsonObject range;
-            range["VALS"] = QJsonArray::fromStringList(leaf.choices);
-            o["RANGE"] = QJsonArray{range};
-        }
-        if (leaf.feedback) {
-            const QVector<Value> last = m_dispatcher->lastFeedback(path);
-            if (!last.isEmpty()) {
-                QJsonArray values;
-                for (const auto &v : last) values.append(toJson(v));
-                o["VALUE"] = values;
-            }
-        }
-    }
-    return o;
-}
-
-QJsonObject QueryTree::containerJson(const QString &path, int depth) const
-{
-    QJsonObject o;
-    o["FULL_PATH"] = path;
-    o["ACCESS"] = 0;
-    if (path == QLatin1String("/")) o["DESCRIPTION"] = QStringLiteral("AtemRemoteOsc");
-
-    const QString prefix = path == QLatin1String("/") ? QStringLiteral("/") : path + QLatin1Char('/');
-    QJsonObject contents;
-    QString lastChild;
-    for (auto it = m_leaves.lowerBound(prefix); it != m_leaves.end() && it.key().startsWith(prefix); ++it) {
-        const QString rest = it.key().mid(prefix.size());
-        const QString child = rest.section('/', 0, 0);
-        if (child == lastChild) continue;
-        lastChild = child;
-        const QString childPath = prefix + child;
-        auto leafIt = m_leaves.constFind(childPath);
-        if (leafIt != m_leaves.constEnd() && !hasChildren(childPath)) {
-            contents[child] = leafJson(childPath, leafIt.value());
-        } else {
-            contents[child] = containerJson(childPath, depth + 1);
-        }
-    }
-    o["CONTENTS"] = contents;
-    return o;
 }
 
 bool QueryTree::node(const QString &pathIn, QJsonObject &out)
 {
     rebuildIfNeeded();
-    QString path = pathIn;
-    while (path.size() > 1 && path.endsWith('/')) path.chop(1);
-    if (path.isEmpty()) path = QStringLiteral("/");
-
-    if (path == QLatin1String("/") || hasChildren(path)) {
-        if (path != QLatin1String("/") && !hasChildren(path)) return false;
-        out = containerJson(path, 0);
-        // A method that also has sub-addresses keeps its own attributes
-        auto it = m_leaves.constFind(path);
-        if (it != m_leaves.constEnd()) {
-            const QJsonObject self = leafJson(path, it.value());
-            for (auto k = self.begin(); k != self.end(); ++k) {
-                if (!out.contains(k.key())) out[k.key()] = k.value();
-            }
-        }
-        return true;
-    }
-    auto it = m_leaves.constFind(path);
-    if (it == m_leaves.constEnd()) return false;
-    out = leafJson(path, it.value());
-    return true;
+    out = m_tree.json(pathIn);
+    return !out.isEmpty();
 }
 
 bool QueryTree::attribute(const QString &path, const QString &attributeName, QJsonObject &out)
 {
-    QJsonObject nodeJson;
-    if (!node(path, nodeJson)) return false;
-    out = QJsonObject();
-    const QString key = attributeName.toUpper();
-    if (nodeJson.contains(key)) out[key] = nodeJson.value(key);
-    return true;
+    rebuildIfNeeded();
+    return m_tree.attribute(path, attributeName, out);
 }
 
 QJsonObject QueryTree::hostInfo(const QString &name, quint16 oscPort) const
@@ -270,12 +199,7 @@ QJsonObject QueryTree::hostInfo(const QString &name, quint16 oscPort) const
     for (const char *k : {"ACCESS", "VALUE", "DESCRIPTION", "RANGE"}) extensions[QLatin1String(k)] = true;
     for (const char *k : {"TAGS", "CLIPMODE", "UNIT", "CRITICAL", "LISTEN", "PATH_CHANGED",
                           "PATH_RENAMED", "PATH_ADDED", "PATH_REMOVED"}) extensions[QLatin1String(k)] = false;
-    QJsonObject o;
-    o["NAME"] = name;
-    o["EXTENSIONS"] = extensions;
-    o["OSC_PORT"] = static_cast<int>(oscPort);
-    o["OSC_TRANSPORT"] = QStringLiteral("UDP");
-    return o;
+    return pxs::Tree::hostInfo(name, static_cast<int>(oscPort), extensions);
 }
 
 } // namespace Osc
