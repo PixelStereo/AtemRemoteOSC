@@ -5,10 +5,11 @@ from pathlib import Path
 import re
 import sys
 
-# Release files carry the tag, as in NyxMap and ISFLab: AtemRemoteOSC-macos-v5.0.6.zip
+# Release files are <App>-<os>-<arch>-<tag>, as in every Pixel Stereo application: AtemRemoteOSC-macos-arm64-v5.0.8.zip
+# (the second name of each pair is the one used before the arch was part of it)
 ASSETS = {
-    "macOS": ("AtemRemoteOSC-macos-{tag}.zip", "apple", "34CC34"),
-    "Windows": ("AtemRemoteOSC-windows-{tag}-Setup.exe", "windows", "CCCC34"),
+    "macOS": (("AtemRemoteOSC-macos-arm64-{tag}.zip", "AtemRemoteOSC-macos-{tag}.zip"), "apple", "34CC34"),
+    "Windows": (("AtemRemoteOSC-windows-x64-{tag}-Setup.exe", "AtemRemoteOSC-windows-{tag}-Setup.exe"), "windows", "CCCC34"),
 }
 START = "<!-- release-downloads:start -->"
 END = "<!-- release-downloads:end -->"
@@ -24,9 +25,9 @@ def download_block(releases, repository):
         assets = {item["name"]: item["browser_download_url"] for item in release.get("assets", [])
                   if item.get("state") == "uploaded" and item.get("size", 0) > 0}
         urls = {}
-        for platform, (pattern, _, _) in ASSETS.items():
-            name = pattern.format(tag=tag)
-            if name not in assets:
+        for platform, (patterns, _, _) in ASSETS.items():
+            name = next((pattern.format(tag=tag) for pattern in patterns if pattern.format(tag=tag) in assets), None)
+            if name is None:
                 break
             urls[platform] = f"{base}/download/{tag}/{name}"
         if len(urls) != len(ASSETS):
