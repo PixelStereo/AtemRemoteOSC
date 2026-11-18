@@ -9,8 +9,7 @@ From TouchOSC, Max, QLab, Companion or any OSC software. Every address answers b
 <!-- release-downloads:start -->
 **LATEST VERSION · [v5.0.8](https://github.com/PixelStereo/AtemRemoteOSC/releases/tag/v5.0.8)**
 
-[![macOS](https://img.shields.io/badge/macOS-Download-34CC34?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/PixelStereo/AtemRemoteOSC/releases/download/v5.0.8/AtemRemoteOSC-macos-v5.0.8.zip)
-[![Windows](https://img.shields.io/badge/Windows-Download-CCCC34?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/PixelStereo/AtemRemoteOSC/releases/download/v5.0.8/AtemRemoteOSC-windows-v5.0.8-Setup.exe)
+[![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple_Silicon-6b7787?style=for-the-badge&logo=apple&logoColor=white&labelColor=1a1c20)](https://github.com/PixelStereo/AtemRemoteOSC/releases/download/v5.0.8/AtemRemoteOSC-macos-v5.0.8.zip)&nbsp;&nbsp;[![Windows Installer](https://img.shields.io/badge/Windows-Installer-2b6fb6?style=for-the-badge&logo=windows&logoColor=white&labelColor=1a1c20)](https://github.com/PixelStereo/AtemRemoteOSC/releases/download/v5.0.8/AtemRemoteOSC-windows-v5.0.8-Setup.exe)
 <!-- release-downloads:end -->
 
 </div>
