@@ -22,11 +22,11 @@ jobs:
         include:
           - name: macOS
             os: macos-latest
-            asset: AtemRemoteOSC-macos-${{ github.ref_type == 'tag' && github.ref_name || github.sha }}.zip
+            asset: AtemRemoteOSC-macos-arm64-${{ github.ref_type == 'tag' && github.ref_name || github.sha }}.zip
           - name: Windows
             os: windows-latest
             qt_arch: win64_msvc2022_64
-            asset: AtemRemoteOSC-windows-${{ github.ref_type == 'tag' && github.ref_name || github.sha }}-Setup.exe
+            asset: AtemRemoteOSC-windows-x64-${{ github.ref_type == 'tag' && github.ref_name || github.sha }}-Setup.exe
     steps:
       - uses: actions/checkout@v4
         with:
