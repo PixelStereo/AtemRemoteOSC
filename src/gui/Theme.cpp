@@ -113,19 +113,6 @@ void paintCheck(QPainter &p, const QRectF &box, bool on, bool hover, bool enable
     p.restore();
 }
 
-QString tabStyle()
-{
-    return QStringLiteral("QTabBar::tab { background:@window; color:@muted; padding:6px 14px; margin-right:3px;"
-                          " font-weight:600; border:1px solid @border; border-bottom:3px solid @midlight;"
-                          " border-top-left-radius:4px; border-top-right-radius:4px; }"
-                          "QTabBar::tab:selected { background:@light; color:@text; border-color:@border;"
-                          " border-bottom:3px solid @link; }"
-                          "QTabBar::tab:hover:!selected { background:@midlight; color:@text; border-color:@border; }"
-                          "QTabBar::tab:disabled { color:@border; border-color:@midlight; }"
-                          "QTabWidget::pane { border:1px solid @border; }")
-        ;
-}
-
 void applyToApplication(QApplication &app)
 {
     static bool filterInstalled = false;
@@ -137,7 +124,7 @@ void applyToApplication(QApplication &app)
     // The graphite look shared by every Pixel Stereo application; the accent stays the one the user chose
     pxs::Palette palette = pxs::graphite();
     palette.link = accent();
-    pxs::apply(app, palette, tabStyle() + QStringLiteral(
+    pxs::apply(app, palette, QStringLiteral(
         // Cards: the grouped settings
         "QGroupBox#section { border:1px solid @border; border-radius:6px; margin-top:12px; padding:14px 10px 10px 10px; }"
         "QGroupBox#section::title { subcontrol-origin:margin; left:11px; padding:0 5px; color:@text; font-weight:600; }"

@@ -15,7 +15,6 @@ QColor accent();
 void setAccent(const QColor &c); // saved in the settings, then the application is restyled
 QColor onAccent();               // text drawn on the accent: dark or light, whichever reads
 QString css(int alpha = 255);    // "#rrggbb", or "rgba(r, g, b, a)" when alpha < 255
-QString tabStyle();
 void applyToApplication(QApplication &app); // palette and global stylesheet (called again on a change)
 
 // Colours of a state, the same everywhere (dots, pills, the status line)
