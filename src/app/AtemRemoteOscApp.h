@@ -10,8 +10,9 @@
 #include "../osc/OscClient.h"
 #include "../osc/OscAddressRegistry.h"
 #include "../osc/OscDispatcher.h"
-#include "../osc/OscQueryServer.h"
-#include "../osc/MdnsResponder.h"
+#include "../osc/OscQueryTree.h"
+#include <pxs/MdnsResponder.h>
+#include <pxs/QueryServer.h>
 #include "../backend/IAtemBackend.h"
 #include "../backend/AtemBackendFactory.h"
 
@@ -86,9 +87,11 @@ private:
     bool m_logDebugOsc = false;
     bool m_oscQueryEnabled = true;
     quint16 m_oscQueryPort = 3334;
+    void refreshQuery();
     Osc::QueryTree *m_queryTree = nullptr;
-    Osc::QueryServer *m_queryServer = nullptr;
-    Osc::MdnsResponder *m_mdns = nullptr;
+    pxs::QueryServer *m_queryServer = nullptr;
+    pxs::MdnsResponder *m_mdns = nullptr;
+    QTimer *m_queryRefresh = nullptr; // the namespace follows the switchers
     QVector<QPair<QDateTime, QString>> m_logHistory;
     QSettings m_settings;
 

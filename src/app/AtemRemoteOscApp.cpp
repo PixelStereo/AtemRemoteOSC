@@ -1,4 +1,7 @@
 #include "AtemRemoteOscApp.h"
+#include "../osc/OscPacket.h"
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QUuid>
 
 AtemRemoteOscApp::AtemRemoteOscApp(QObject *parent)
@@ -30,10 +33,32 @@ bool AtemRemoteOscApp::initialize() {
     m_dispatcher = new Osc::Dispatcher(m_registry, this);
     m_oscServer = new Osc::Server(this);
     m_queryTree = new Osc::QueryTree(m_registry, m_dispatcher);
-    m_queryServer = new Osc::QueryServer(m_queryTree, this);
-    m_mdns = new Osc::MdnsResponder(this);
-    connect(m_queryServer, &Osc::QueryServer::logMessage, this, &AtemRemoteOscApp::logMessage);
-    connect(m_mdns, &Osc::MdnsResponder::logMessage, this, &AtemRemoteOscApp::logMessage);
+    m_queryServer = new pxs::QueryServer(m_queryTree->tree(), this);
+    m_queryServer->setName(QStringLiteral("AtemRemoteOsc"));
+    QJsonObject extensions = pxs::Tree::defaultExtensions();
+    extensions["LISTEN"] = true;       // the WebSocket of the same port: every feedback, as OSC, to the clients that listen
+    extensions["PATH_CHANGED"] = true; // the switchers and what they have changed
+    m_queryServer->setExtensions(extensions);
+    m_mdns = new pxs::MdnsResponder(this);
+    connect(m_queryServer, &pxs::QueryServer::logMessage, this, &AtemRemoteOscApp::logMessage);
+    connect(m_mdns, &pxs::MdnsResponder::logMessage, this, &AtemRemoteOscApp::logMessage);
+    m_queryRefresh = new QTimer(this);
+    m_queryRefresh->setInterval(1500);
+    connect(m_queryRefresh, &QTimer::timeout, this, &AtemRemoteOscApp::refreshQuery);
+    // What the switcher says goes to the WebSocket clients that listen to that address
+    connect(m_dispatcher, &Osc::Dispatcher::feedbackSent, this,
+            [this](const QString &address, const QVector<Osc::Value> &args) {
+                if (!m_queryServer->webSocketCount()) return;
+                Osc::Message message(address);
+                for (const auto &v : args) message.addValue(v);
+                m_queryServer->stream(address, Osc::Packet::encodeMessage(message));
+            });
+    // And what a WebSocket client writes is dispatched like a datagram
+    connect(m_queryServer, &pxs::QueryServer::packetReceived, this, [this](const QByteArray &packet) {
+        QList<Osc::Message> messages;
+        if (Osc::Packet::decode(packet, messages))
+            for (const auto &message : messages) m_dispatcher->dispatchMessage(message, QHostAddress::LocalHost, 0);
+    });
 
     connect(m_dispatcher, &Osc::Dispatcher::logMessage, this, [this](const QString &msg) {
         if (m_logDebugOsc || !msg.startsWith(QLatin1String("Received OSC"))) {
@@ -87,11 +112,21 @@ void AtemRemoteOscApp::setOscQuery(bool enabled, quint16 port) {
     restartOscQuery();
 }
 
+// The namespace is the switchers' and what they have: built before it is served, and again when it changes (the clients are told)
+void AtemRemoteOscApp::refreshQuery() {
+    if (!m_queryTree->refresh()) return;
+    m_queryServer->broadcast(QJsonDocument(QJsonObject{{"COMMAND", "PATH_CHANGED"}, {"DATA", "/"}}).toJson(QJsonDocument::Compact));
+}
+
 void AtemRemoteOscApp::restartOscQuery() {
     m_mdns->stop();
     m_queryServer->stop();
+    m_queryRefresh->stop();
+    m_queryTree->refresh();
     if (m_oscQueryEnabled && m_queryServer->start(m_oscQueryPort)) {
         m_queryServer->setOscPort(m_incomingPort);
+        m_queryServer->setHostInfoMore(QJsonObject{{"WS_PORT", int(m_queryServer->port())}});
+        m_queryRefresh->start();
         const QString instance = QStringLiteral("AtemRemoteOsc");
         m_mdns->start(instance, { {QStringLiteral("_oscjson._tcp"), m_queryServer->port()},
                                   {QStringLiteral("_osc._udp"), m_incomingPort} });

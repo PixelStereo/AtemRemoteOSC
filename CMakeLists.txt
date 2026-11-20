@@ -56,10 +56,6 @@ set(SOURCES
     src/osc/TimedTransition.cpp
     src/osc/OscQueryTree.h
     src/osc/OscQueryTree.cpp
-    src/osc/OscQueryServer.h
-    src/osc/OscQueryServer.cpp
-    src/osc/MdnsResponder.h
-    src/osc/MdnsResponder.cpp
     src/backend/AtemTypes.h
     src/backend/IAtemBackend.h
     src/backend/AtemBackendFactory.h
@@ -149,6 +145,7 @@ target_link_libraries(AtemRemoteOsc PRIVATE
     Qt6::Network
     pxs::theme
     pxs::tree
+    pxs::oscquery
 )
 
 if(APPLE)
@@ -184,10 +181,6 @@ add_executable(test_osc
     src/osc/TimedTransition.cpp
     src/osc/OscQueryTree.h
     src/osc/OscQueryTree.cpp
-    src/osc/OscQueryServer.h
-    src/osc/OscQueryServer.cpp
-    src/osc/MdnsResponder.h
-    src/osc/MdnsResponder.cpp
     src/backend/AtemTypes.h
     src/backend/IAtemBackend.h
     src/backend/null/NullAtemBackend.h
@@ -197,6 +190,7 @@ target_link_libraries(test_osc PRIVATE
     Qt6::Network
     Qt6::Test
     pxs::tree
+    pxs::oscquery
 )
 add_test(NAME test_osc COMMAND test_osc)
 
