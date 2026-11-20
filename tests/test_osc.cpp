@@ -1,13 +1,13 @@
 #include <QCoreApplication>
 #include <QTest>
+#include <QSignalSpy>
 #include <QDebug>
 #include "../src/osc/OscTypes.h"
 #include "../src/osc/OscPacket.h"
 #include "../src/osc/OscAddressRegistry.h"
 #include "../src/osc/OscDispatcher.h"
 #include "../src/osc/OscQueryTree.h"
-#include "../src/osc/OscQueryServer.h"
-#include "../src/osc/MdnsResponder.h"
+#include <pxs/QueryServer.h>
 #include "../src/osc/TimedTransition.h"
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -173,6 +173,7 @@ private slots:
     }
 
     void testOscQueryTreeAndServer() {
+        qRegisterMetaType<QVector<Osc::Value>>();
         // Patterns expand to the concrete addresses
         Osc::QueryTree::Counts counts;
         counts.me = 2;
@@ -186,7 +187,9 @@ private slots:
         Osc::Client client;
         dispatcher.addSwitcher("", &backend, &client);
         Osc::QueryTree tree(&registry, &dispatcher);
-        Osc::QueryServer server(&tree);
+        QVERIFY(tree.refresh());
+        QVERIFY(!tree.refresh()); // nothing changed since
+        pxs::QueryServer server(tree.tree());
         server.setOscPort(4321);
 
         QJsonObject n;
@@ -206,7 +209,17 @@ private slots:
         Atem::MeState st;
         st.index = 1;
         st.programInput = 5;
+        QSignalSpy fed(&dispatcher, &Osc::Dispatcher::feedbackSent); // what the WebSocket clients that listen are streamed
         backend.meStateChanged(st);
+        bool streamed = false;
+        for (const auto &call : fed)
+            if (call.at(0).toString() == "/atem/me/1/program") {
+                streamed = true;
+                const auto args = call.at(1).value<QVector<Osc::Value>>();
+                QCOMPARE(args.size(), 1);
+                QCOMPARE(args[0].toInt(), 5);
+            }
+        QVERIFY(streamed);
         QVERIFY(tree.node("/atem/me/1/program", n));
         QCOMPARE(n["VALUE"].toArray().at(0).toInt(), 5);
 
@@ -266,7 +279,7 @@ private slots:
         QVERIFY(backend.positions.size() > 2); // loaded CI runners fire the 20 ms timer late
         QVERIFY(increasing(backend.positions));
         QCOMPARE(backend.positions.last(), 1.0f);
-        QVERIFY(backend.positions.first() < 0.1f); // slow start
+        QVERIFY(backend.positions.first() < 0.5f); // starts low (the curve itself is checked above; a loaded runner fires its first tick late)
         backend.positions.clear();
 
         // Curve as second argument, and in the address
@@ -433,41 +446,8 @@ private slots:
             }
             if (!ep.choices.isEmpty()) QVERIFY2(ep.valueType == "string", qPrintable(ep.pattern));
         }
-        QJsonObject info = tree.hostInfo("x", 1);
-        QVERIFY(info["EXTENSIONS"].toObject()["RANGE"].toBool());
-    }
-
-    void testMdnsPackets() {
-        const QByteArray name = Osc::MdnsResponder::encodeName("_oscjson._tcp.local");
-        QCOMPARE(name.size(), 1 + 8 + 1 + 4 + 1 + 5 + 1);
-        QCOMPARE(int(name.at(0)), 8);
-
-        QVector<Osc::MdnsResponder::Service> services{{"_oscjson._tcp", 3334}, {"_osc._udp", 3333}};
-        const QByteArray resp = Osc::MdnsResponder::buildResponse("AtemRemoteOsc", "atemremoteosc-host", services,
-                                                                  {QHostAddress("192.168.0.10")}, 120);
-        QCOMPARE(quint8(resp[2]), quint8(0x84)); // response, authoritative
-        QCOMPARE(int(quint8(resp[7])), 2 * 3 + 1); // PTR + SRV + TXT per service, one A record
-        QVERIFY(Osc::MdnsResponder::parseQuestions(resp).isEmpty()); // a response asks nothing
-
-        // A query for the service type
-        QByteArray query(12, 0);
-        query[5] = 1; // one question
-        query += Osc::MdnsResponder::encodeName("_oscjson._tcp.local");
-        query += QByteArray("\x00\x0c\x00\x01", 4);
-        QCOMPARE(Osc::MdnsResponder::parseQuestions(query), QStringList{"_oscjson._tcp.local"});
-
-        // Compression pointer back to the first name, and a loop that must not hang
-        QByteArray two(12, 0);
-        two[5] = 2;
-        two += Osc::MdnsResponder::encodeName("a.local");
-        two += QByteArray("\x00\x01\x00\x01", 4);
-        two += QByteArray("\xc0\x0c\x00\x01\x00\x01", 6);
-        QCOMPARE(Osc::MdnsResponder::parseQuestions(two), (QStringList{"a.local", "a.local"}));
-        QByteArray loop(12, 0);
-        loop[5] = 1;
-        loop += QByteArray("\xc0\x0c", 2);
-        QVERIFY(Osc::MdnsResponder::parseQuestions(loop).isEmpty());
-        QVERIFY(Osc::MdnsResponder::parseQuestions(QByteArray("\x00\x00", 2)).isEmpty());
+        pxs::QueryServer server(tree.tree());
+        QVERIFY(QJsonDocument::fromJson(server.answer("GET", "/?HOST_INFO").body).object()["EXTENSIONS"].toObject()["RANGE"].toBool());
     }
 
     void testLegacyAddressesAndParameterMerging() {

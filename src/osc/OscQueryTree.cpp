@@ -94,7 +94,7 @@ QStringList QueryTree::expand(const QString &pattern, const Counts &counts)
     return results;
 }
 
-void QueryTree::rebuildIfNeeded()
+bool QueryTree::rebuildIfNeeded()
 {
     // What the tree depends on: the switchers, what they have, and the audio inputs seen so far
     Counts counts;
@@ -119,7 +119,7 @@ void QueryTree::rebuildIfNeeded()
     for (qint64 a : sorted) signature += QString::number(a) + QLatin1Char(',');
     signature += QString::number(m_registry->endpoints().size());
 
-    if (signature == m_signature && !m_tree.root().children().empty()) return;
+    if (signature == m_signature && !m_tree.root().children().empty()) return false;
     m_signature = signature;
     m_tree.clear();
     m_tree.root().description = QStringLiteral("AtemRemoteOsc");
@@ -152,7 +152,7 @@ void QueryTree::rebuildIfNeeded()
             const QStringList paths = expand(ep.pattern, c);
             const QStringList patternParts = ep.pattern.split('/');
             for (const QString &p : paths) {
-                if (++leaves > kMaxLeaves) return;
+                if (++leaves > kMaxLeaves) return true;
                 // "Set Program input for M/E <me>" -> "... M/E 1"
                 QString description = ep.description;
                 const QStringList parts = p.split('/');
@@ -178,6 +178,7 @@ void QueryTree::rebuildIfNeeded()
             }
         }
     }
+    return true;
 }
 
 bool QueryTree::node(const QString &pathIn, QJsonObject &out)
@@ -191,15 +192,6 @@ bool QueryTree::attribute(const QString &path, const QString &attributeName, QJs
 {
     rebuildIfNeeded();
     return m_tree.attribute(path, attributeName, out);
-}
-
-QJsonObject QueryTree::hostInfo(const QString &name, quint16 oscPort) const
-{
-    QJsonObject extensions;
-    for (const char *k : {"ACCESS", "VALUE", "DESCRIPTION", "RANGE"}) extensions[QLatin1String(k)] = true;
-    for (const char *k : {"TAGS", "CLIPMODE", "UNIT", "CRITICAL", "LISTEN", "PATH_CHANGED",
-                          "PATH_RENAMED", "PATH_ADDED", "PATH_REMOVED"}) extensions[QLatin1String(k)] = false;
-    return pxs::Tree::hostInfo(name, static_cast<int>(oscPort), extensions);
 }
 
 } // namespace Osc

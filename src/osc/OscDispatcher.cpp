@@ -152,6 +152,7 @@ void Dispatcher::sendFeedback(Atem::IAtemBackend *backend, const QString &subAdd
         if (r.backend != backend) continue;
         const QString fullAddr = makeAddress(r.nickname, subAddress);
         m_lastFeedback.insert(fullAddr, args); // also served by OSCQuery
+        emit feedbackSent(fullAddr, args);
         if (r.client && r.client->isValidTarget()) {
             r.client->sendMessage(fullAddr, args);
         }

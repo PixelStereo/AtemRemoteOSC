@@ -21,7 +21,7 @@ From TouchOSC, Max, QLab, Companion or any OSC software. Every address answers b
 - **Everything the switcher does**: program and preview, transitions, keyers, SuperSource, audio and Fairlight, MultiView, macros, recording, streaming, camera control.
 - **Timed transitions of any length**, with easing, far beyond the 10 seconds of the switcher.
 - **Feedback everywhere**: every change on the switcher is sent back as OSC.
-- **OSCQuery**: sliders, ranges and live values appear by themselves in OSCQuery browsers.
+- **OSCQuery**: sliders, ranges and live values appear by themselves in OSCQuery browsers, which can also listen (WebSocket) to every value as it changes and write back through the same connection.
 - **Several switchers** at once, **macOS and Windows**, free and open source.
 
 ## Quick start

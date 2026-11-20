@@ -17,13 +17,16 @@ class QueryTree {
 public:
     QueryTree(const AddressRegistry *registry, const Dispatcher *dispatcher);
 
+    // The tree to serve (pxs::QueryServer answers from it); `refresh()` builds it, and again when the switchers or what
+    // they have changed: true when it did
+    const pxs::Tree *tree() const { return &m_tree; }
+    bool refresh() { return rebuildIfNeeded(); }
+
     // The JSON node of an OSC path ("/" is the root); false when the path does not exist
     bool node(const QString &path, QJsonObject &out);
     // One attribute of a node (?VALUE, ?TYPE, ...); false when the node does not exist, `out` empty when the
     // attribute has no value (the HTTP answer is then 204)
     bool attribute(const QString &path, const QString &attribute, QJsonObject &out);
-
-    QJsonObject hostInfo(const QString &name, quint16 oscPort) const;
 
     // Concrete addresses a pattern stands for, given what the switcher has (exposed for tests)
     struct Counts {
@@ -33,7 +36,7 @@ public:
     static QStringList expand(const QString &pattern, const Counts &counts);
 
 private:
-    void rebuildIfNeeded();
+    bool rebuildIfNeeded();
 
     const AddressRegistry *m_registry;
     const Dispatcher *m_dispatcher;

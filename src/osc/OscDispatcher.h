@@ -51,6 +51,8 @@ public slots:
 
 signals:
     void logMessage(const QString &text);
+    // A value sent back as feedback, on its full OSC address (also streamed to the OSCQuery clients that listen to it)
+    void feedbackSent(const QString &fullAddress, const QVector<Osc::Value> &arguments);
 
 private slots:
     // Feedback handlers from IAtemBackend
