@@ -10,7 +10,7 @@ project(AtemRemoteOsc VERSION "${atem_version}" LANGUAGES C CXX)
 # trailing "+" for uncommitted changes ("5.0.6+3+")
 set(ATEM_DISPLAY_VERSION "${PROJECT_VERSION}")
 if(NOT DEFINED ATEMREMOTEOSC_TAG_VERSION AND NOT ATEMREMOTEOSC_RELEASE_BUILD)
-    include(third_party/pxs/cmake/PixelStereoBuildId.cmake)
+    include(third_party/pxs-qt/cmake/PixelStereoBuildId.cmake)
     pxs_nearest_release("${CMAKE_CURRENT_SOURCE_DIR}" atem_release)
     if(NOT atem_release STREQUAL "")
         set(ATEM_DISPLAY_VERSION "${atem_release}") # the tag the commits are counted from, even before VERSION catches up
@@ -35,7 +35,7 @@ set(CMAKE_AUTOUIC ON)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
 # Shared Pixel Stereo code (the look), pinned as a submodule
 set(PXS_BUILD_TESTS OFF)
-add_subdirectory(third_party/pxs EXCLUDE_FROM_ALL)
+add_subdirectory(third_party/pxs-qt EXCLUDE_FROM_ALL)
 
 set(SOURCES
     src/main.cpp
