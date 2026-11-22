@@ -1,5 +1,7 @@
 #include "AtemRemoteOscApp.h"
 #include "../osc/OscPacket.h"
+#include <pxs/Convert.h>
+#include <pxs/core/tree/oscquery.h>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QUuid>
@@ -35,7 +37,7 @@ bool AtemRemoteOscApp::initialize() {
     m_queryTree = new Osc::QueryTree(m_registry, m_dispatcher);
     m_queryServer = new pxs::QueryServer(m_queryTree->tree(), this);
     m_queryServer->setName(QStringLiteral("AtemRemoteOsc"));
-    QJsonObject extensions = pxs::Tree::defaultExtensions();
+    QJsonObject extensions = pxs::convert::jsonObjectFromText(pxs::core::tree::defaultExtensionsJson());
     extensions["LISTEN"] = true;       // the WebSocket of the same port: every feedback, as OSC, to the clients that listen
     extensions["PATH_CHANGED"] = true; // the switchers and what they have changed
     m_queryServer->setExtensions(extensions);
