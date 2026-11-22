@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # the tags: the application's name counts commits since the last release
-          submodules: true # third_party/pxs
+          submodules: recursive # third_party/pxs-qt
       - uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
