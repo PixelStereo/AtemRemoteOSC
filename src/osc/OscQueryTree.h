@@ -6,12 +6,12 @@
 #include <QString>
 #include "OscAddressRegistry.h"
 #include "OscDispatcher.h"
-#include <pxs/Tree.h>
+#include <pxs/core/tree/tree.h>
 
 namespace Osc {
 
 // The OSC address space as OSCQuery describes it: the registered address patterns expanded into concrete
-// addresses (M/E 1, 2, ... according to the connected switcher), with the last known values. It is a pxs::Tree, which
+// addresses (M/E 1, 2, ... according to the connected switcher), with the last known values. It is a pxs::core::tree::Tree, which
 // gives the JSON and the attributes.
 class QueryTree {
 public:
@@ -19,7 +19,7 @@ public:
 
     // The tree to serve (pxs::QueryServer answers from it); `refresh()` builds it, and again when the switchers or what
     // they have changed: true when it did
-    const pxs::Tree *tree() const { return &m_tree; }
+    const pxs::core::tree::Tree *tree() const { return &m_tree; }
     bool refresh() { return rebuildIfNeeded(); }
 
     // The JSON node of an OSC path ("/" is the root); false when the path does not exist
@@ -40,7 +40,7 @@ private:
 
     const AddressRegistry *m_registry;
     const Dispatcher *m_dispatcher;
-    pxs::Tree m_tree; // the address space; OSCQuery is derived from it
+    pxs::core::tree::Tree m_tree; // the address space; OSCQuery is derived from it
     QString m_signature;
 };
 

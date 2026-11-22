@@ -1,4 +1,7 @@
 #include "OscQueryTree.h"
+
+#include <pxs/Convert.h>
+#include <pxs/core/tree/oscquery.h>
 #include <QJsonArray>
 #include <QRegularExpression>
 #include <algorithm>
@@ -18,15 +21,15 @@ QString typeTag(const QString &valueType)
     return QString();
 }
 
-QVariant toVariant(const Value &v)
+pxs::core::Value toValue(const Value &v)
 {
     switch (v.type()) {
-        case Type::Int32: return v.toInt();
-        case Type::Float32: return static_cast<double>(v.toFloat());
-        case Type::True: return true;
-        case Type::False: return false;
-        case Type::String: return v.toString();
-        default: return QVariant();
+        case Type::Int32: return pxs::core::Value(static_cast<int>(v.toInt()));
+        case Type::Float32: return pxs::core::Value(static_cast<double>(v.toFloat()));
+        case Type::True: return pxs::core::Value(true);
+        case Type::False: return pxs::core::Value(false);
+        case Type::String: return pxs::core::Value(pxs::convert::toUtf8(v.toString()));
+        default: return pxs::core::Value();
     }
 }
 
@@ -122,7 +125,7 @@ bool QueryTree::rebuildIfNeeded()
     if (signature == m_signature && !m_tree.root().children().empty()) return false;
     m_signature = signature;
     m_tree.clear();
-    m_tree.root().description = QStringLiteral("AtemRemoteOsc");
+    m_tree.root().description = "AtemRemoteOsc";
 
     if (backends.isEmpty()) {
         nicknames.append(QString());
@@ -142,12 +145,14 @@ bool QueryTree::rebuildIfNeeded()
         const QString prefix = nicknames[i].isEmpty() ? QStringLiteral("/atem") : QStringLiteral("/atem/") + nicknames[i];
         for (const auto &ep : m_registry->endpoints()) {
             const QString type = typeTag(ep.valueType);
-            QJsonArray range;
+            std::vector<pxs::core::tree::ArgRange> range;
             // One entry per argument: the interval of a number, or the accepted strings
             if (ep.hasRange && (type == QLatin1String("f") || type == QLatin1String("i"))) {
-                range = QJsonArray{QJsonObject{{"MIN", ep.rangeMin}, {"MAX", ep.rangeMax}}};
+                range = {pxs::core::tree::ArgRange{pxs::core::Value(static_cast<double>(ep.rangeMin)), pxs::core::Value(static_cast<double>(ep.rangeMax)), {}, {}}};
             } else if (!ep.choices.isEmpty() && type == QLatin1String("s")) {
-                range = QJsonArray{QJsonObject{{"VALS", QJsonArray::fromStringList(ep.choices)}}};
+                pxs::core::tree::ArgRange keys;
+                for (const QString &choice : ep.choices) keys.vals.emplace_back(pxs::convert::toUtf8(choice));
+                range = {keys};
             }
             const QStringList paths = expand(ep.pattern, c);
             const QStringList patternParts = ep.pattern.split('/');
@@ -160,17 +165,17 @@ bool QueryTree::rebuildIfNeeded()
                     if (patternParts[k].startsWith('<')) description.replace(patternParts[k], parts[k]);
                 }
                 const QString full = prefix + p;
-                pxs::Node &node = m_tree.add(full);
-                node.description = description;
+                pxs::core::tree::Node &node = m_tree.add(pxs::convert::toUtf8(full));
+                node.description = pxs::convert::toUtf8(description);
                 node.access = ep.feedback ? 3 : 2; // read/write, or write only
-                node.type = type;
+                node.type = pxs::convert::toUtf8(type);
                 if (!type.isEmpty()) {
                     node.range = range;
                     if (ep.feedback) {
                         const Dispatcher *dispatcher = m_dispatcher;
                         node.get = [dispatcher, full] {
-                            QVariantList values;
-                            for (const Value &v : dispatcher->lastFeedback(full)) values.append(toVariant(v));
+                            pxs::core::ValueList values;
+                            for (const Value &v : dispatcher->lastFeedback(full)) values.push_back(toValue(v));
                             return values;
                         };
                     }
@@ -184,14 +189,17 @@ bool QueryTree::rebuildIfNeeded()
 bool QueryTree::node(const QString &pathIn, QJsonObject &out)
 {
     rebuildIfNeeded();
-    out = m_tree.json(pathIn);
+    out = pxs::convert::jsonObjectFromText(pxs::core::tree::describeJson(m_tree, pxs::convert::toUtf8(pathIn)));
     return !out.isEmpty();
 }
 
 bool QueryTree::attribute(const QString &path, const QString &attributeName, QJsonObject &out)
 {
     rebuildIfNeeded();
-    return m_tree.attribute(path, attributeName, out);
+    std::string text;
+    if (!pxs::core::tree::attributeJson(m_tree, pxs::convert::toUtf8(path), pxs::convert::toUtf8(attributeName), text)) return false;
+    out = pxs::convert::jsonObjectFromText(text);
+    return true;
 }
 
 } // namespace Osc
