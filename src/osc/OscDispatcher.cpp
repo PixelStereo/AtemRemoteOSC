@@ -214,6 +214,25 @@ void Dispatcher::dispatchMessage(const Osc::Message &message, const QHostAddress
     }
     while (cmdPath.size() > 1 && cmdPath.endsWith('/')) cmdPath.chop(1);
 
+    int endpoint = m_registry->rowForAddress(cmdPath, false);
+    if (endpoint < 0 && cmdPath.startsWith(QLatin1String("/transition/")))
+        endpoint = m_registry->rowForAddress(QStringLiteral("/me/1") + cmdPath, false);
+    if (endpoint >= 0 && !m_registry->endpoints().at(endpoint).writable) {
+        if (message.argumentCount() == 0 && cmdPath.startsWith(QLatin1String("/macros/"))) {
+            auto *backend = targetRoute->backend;
+            if (cmdPath == QLatin1String("/macros/max-number")) {
+                sendFeedback(backend, cmdPath, {Value(static_cast<int32_t>(backend->maxMacros()))});
+            } else {
+                const auto values = lastFeedback(makeAddress(targetRoute->nickname, cmdPath));
+                if (values.isEmpty()) backend->requestStatus();
+                else sendFeedback(backend, cmdPath, values);
+            }
+            return;
+        }
+        emit logMessage(QStringLiteral("Read-only OSC address: %1").arg(addr));
+        return;
+    }
+
     const Value arg0 = message.arg(0);
     m_arg1 = message.arg(1);
     if (handleCommand(*targetRoute, cmdPath, arg0)) {

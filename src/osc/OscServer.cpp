@@ -27,6 +27,7 @@ bool Server::start(quint16 port, const QHostAddress &address) {
         return false;
     }
 
+    m_port = m_socket->localPort();
     return true;
 }
 

@@ -100,6 +100,8 @@ public:
         }
     }
 
+    int64_t wireInt64() const { return m_int64; }
+    double wireDouble() const { return m_double; }
     QByteArray toBlob() const { return m_blob; }
 
 private:

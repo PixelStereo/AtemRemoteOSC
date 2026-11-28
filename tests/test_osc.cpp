@@ -54,12 +54,103 @@ static void addArg(Osc::Message &m, const QString &v) { m.addString(v); }
 class TestOsc : public QObject {
     Q_OBJECT
 private slots:
+    void testAllDeclaredOscAddresses() {
+        Osc::AddressRegistry registry;
+        Osc::Dispatcher dispatcher(&registry);
+        RecordingBackend backend;
+        dispatcher.addSwitcher(QString(), &backend, nullptr);
+        Osc::Server server;
+        QVERIFY(server.start(0, QHostAddress::LocalHost));
+        connect(&server, &Osc::Server::messageReceived, &dispatcher, &Osc::Dispatcher::dispatchMessage);
+        int received = 0;
+        connect(&server, &Osc::Server::messageReceived, this,
+                [&](const Osc::Message &, const QHostAddress &, quint16) { ++received; });
+        QString rejection;
+        connect(&dispatcher, &Osc::Dispatcher::logMessage, this, [&](const QString &text) {
+            if (text.startsWith("Unknown or unsupported OSC address:") || text.startsWith("Read-only OSC address:") ||
+                text.startsWith("Error:") || text.contains("is not implemented")) rejection = text;
+        });
+        Osc::QueryTree query(&registry, &dispatcher);
+        query.refresh();
+        Osc::QueryTree::Counts counts;
+        counts.me = backend.meCount();
+        counts.dsk = backend.dskCount();
+        counts.aux = backend.auxCount();
+        counts.hyperdeck = backend.hyperdeckCount();
+        counts.macros = int(backend.maxMacros());
+
+        QUdpSocket sender;
+        QStringList failures;
+        int attempted = 0;
+        int readOnly = 0;
+        for (const auto &ep : registry.endpoints()) {
+            for (const auto &path : Osc::QueryTree::expand(ep.pattern, counts)) {
+                Osc::Message message("/atem" + path);
+                if (ep.valueType == "int") message.addInt(ep.hasRange ? int(ep.rangeMax) : 1);
+                else if (ep.valueType == "float") message.addFloat(ep.hasRange ? float(ep.rangeMax) : 0.5f);
+                else if (ep.valueType == "bool") message.addBool(true);
+                else if (ep.valueType == "string") {
+                    if (!ep.choices.isEmpty()) message.addString(ep.choices.front());
+                    else if (ep.pattern == "/clock/time") message.addString("00:00:01");
+                    else if (ep.pattern.startsWith("/hyperdeck/")) message.addString("00:00:00:01");
+                    else message.addString("smoke-test");
+                } else {
+                    QCOMPARE(ep.valueType, QString("none"));
+                    message.addBang();
+                }
+                QJsonObject node;
+                QVERIFY2(query.node(message.address(), node), qPrintable(message.address()));
+                rejection.clear();
+                const auto packet = Osc::Packet::encodeMessage(message);
+                QVERIFY(!packet.isEmpty());
+                QCOMPARE(sender.writeDatagram(packet, QHostAddress::LocalHost, server.port()), qint64(packet.size()));
+                ++attempted;
+                QTRY_COMPARE_WITH_TIMEOUT(received, attempted, 1000);
+                const bool writable = (node.value("ACCESS").toInt() & 2) != 0;
+                QCOMPARE(writable, ep.writable);
+                if (!writable) ++readOnly;
+                if (writable ? !rejection.isEmpty() : !rejection.startsWith("Read-only OSC address:"))
+                    failures << ep.pattern + (rejection.isEmpty() ? ": read-only address accepted a write" : ": command rejected");
+            }
+        }
+        qInfo() << "OSC datagrams tested:" << attempted << "| writable:" << attempted - readOnly << "| read-only:" << readOnly;
+        failures.removeDuplicates();
+        QVERIFY2(failures.isEmpty(), qPrintable(failures.join('\n')));
+    }
+
+    void testMacroFeedbackCanBeRequestedWithoutWriting() {
+        Osc::AddressRegistry registry;
+        Osc::Dispatcher dispatcher(&registry);
+        RecordingBackend backend;
+        dispatcher.addSwitcher("studio", &backend, nullptr);
+        Atem::MacroState macro;
+        macro.index = 3;
+        macro.name = "Opening";
+        macro.isValid = true;
+        emit backend.macroStateChanged(macro);
+        QString returnedAddress;
+        QVector<Osc::Value> returned;
+        connect(&dispatcher, &Osc::Dispatcher::feedbackSent, this,
+                [&](const QString &address, const QVector<Osc::Value> &values) {
+                    returnedAddress = address;
+                    returned = values;
+                });
+        dispatcher.dispatchMessage(Osc::Message("/atem/studio/macros/3/name"), QHostAddress::LocalHost, 0);
+        QCOMPARE(returnedAddress, QString("/atem/studio/macros/3/name"));
+        QCOMPARE(returned.value(0).toString(), QString("Opening"));
+        dispatcher.dispatchMessage(Osc::Message("/atem/studio/macros/max-number"), QHostAddress::LocalHost, 0);
+        QCOMPARE(returnedAddress, QString("/atem/studio/macros/max-number"));
+        QCOMPARE(returned.value(0).toInt(), int(backend.maxMacros()));
+    }
+
     void testOscEncodeDecode() {
         Osc::Message msg("/atem/me/1/program");
         msg.addInt(5);
         msg.addFloat(0.75f);
         msg.addString("camera1");
         msg.addBool(true);
+        msg.addValue(Osc::Value(int64_t{9007199254740993LL}));
+        msg.addValue(Osc::Value(1.0 / 3.0));
 
         QByteArray encoded = Osc::Packet::encodeMessage(msg);
         QVERIFY(!encoded.isEmpty());
@@ -72,11 +163,13 @@ private slots:
 
         const auto &outMsg = decoded[0];
         QCOMPARE(outMsg.address(), QString("/atem/me/1/program"));
-        QCOMPARE(outMsg.argumentCount(), 4);
+        QCOMPARE(outMsg.argumentCount(), 6);
         QCOMPARE(outMsg.arg(0).toInt(), 5);
         QVERIFY(qAbs(outMsg.arg(1).toFloat() - 0.75f) < 0.001f);
         QCOMPARE(outMsg.arg(2).toString(), QString("camera1"));
         QCOMPARE(outMsg.arg(3).toBool(), true);
+        QCOMPARE(outMsg.arg(4).wireInt64(), int64_t{9007199254740993LL});
+        QCOMPARE(outMsg.arg(5).wireDouble(), 1.0 / 3.0);
     }
 
     void testAddressRegistry() {

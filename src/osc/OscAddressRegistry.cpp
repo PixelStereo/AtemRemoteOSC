@@ -55,13 +55,14 @@ QVariant AddressRegistry::headerData(int section, Qt::Orientation orientation, i
 }
 
 void AddressRegistry::registerEndpoint(const QString &pattern, const QString &description,
-                                       const QString &valueType, const QString &category, bool feedback) {
+                                       const QString &valueType, const QString &category, bool feedback, bool writable) {
     if (m_patternIndex.contains(pattern)) {
         int row = m_patternIndex[pattern];
         m_endpoints[row].description = description;
         m_endpoints[row].valueType = valueType;
         m_endpoints[row].category = category;
         m_endpoints[row].feedback = feedback;
+        m_endpoints[row].writable = writable;
         emit dataChanged(index(row, 0), index(row, ColCount - 1));
         return;
     }
@@ -74,6 +75,7 @@ void AddressRegistry::registerEndpoint(const QString &pattern, const QString &de
     def.valueType = valueType;
     def.category = category;
     def.feedback = feedback;
+    def.writable = writable;
     m_endpoints.append(def);
     m_patternIndex[pattern] = newRow;
     endInsertRows();
@@ -81,7 +83,7 @@ void AddressRegistry::registerEndpoint(const QString &pattern, const QString &de
 
 // Registered patterns contain placeholders ("/me/<me>/program"); feedback uses concrete addresses
 // ("/me/1/program"). A placeholder segment matches any numeric segment.
-int AddressRegistry::rowForAddress(const QString &address) {
+int AddressRegistry::rowForAddress(const QString &address, bool cache) {
     auto exact = m_patternIndex.constFind(address);
     if (exact != m_patternIndex.constEnd()) return exact.value();
 
@@ -105,7 +107,7 @@ int AddressRegistry::rowForAddress(const QString &address) {
         }
         if (match) found = row;
     }
-    m_concreteIndex.insert(address, found);
+    if (cache) m_concreteIndex.insert(address, found);
     return found;
 }
 
@@ -282,12 +284,14 @@ void AddressRegistry::initStandardEndpoints() {
 
     // Macros
     registerEndpoint("/macros/stop", "Stop currently running macro", "none", "Macros", true);
-    registerEndpoint("/macros/max-number", "Query maximum supported macros count", "none", "Macros", false);
+    registerEndpoint("/macros/max-number", "Maximum supported macro count", "int", "Macros", true, false);
     registerEndpoint("/macros/<index>/run", "Run macro at <index>", "none", "Macros", true);
     registerEndpoint("/macros/<index>/loop", "Set whether macro loops upon completion", "bool", "Macros", true);
-    registerEndpoint("/macros/<index>/name", "Query name of macro at <index>", "none", "Macros", false);
-    registerEndpoint("/macros/<index>/description", "Query description of macro at <index>", "none", "Macros", false);
-    registerEndpoint("/macros/<index>/is-valid", "Query validity status of macro at <index>", "none", "Macros", false);
+    registerEndpoint("/macros/<index>/name", "Name of macro at <index>", "string", "Macros", true, false);
+    registerEndpoint("/macros/<index>/description", "Description of macro at <index>", "string", "Macros", true, false);
+    registerEndpoint("/macros/<index>/is-valid", "Whether macro <index> is valid", "bool", "Macros", true, false);
+
+    registerEndpoint("/macros/<index>/status", "Macro status (idle, running, waiting)", "string", "Macros", true, false);
 
     // HyperDecks
     registerEndpoint("/hyperdeck/<number>/play", "Start HyperDeck playback", "none", "HyperDeck", true);
@@ -337,11 +341,11 @@ void AddressRegistry::initStandardEndpoints() {
     registerEndpoint("/clock/y", "Display clock vertical position", "float", "Display Clock", false);
     registerEndpoint("/stream/url", "Streaming server URL", "string", "Streaming", false);
     registerEndpoint("/stream/key", "Streaming key", "string", "Streaming", false);
-    registerEndpoint("/recording/state", "Recording state feedback (idle | recording)", "string", "Recording", true);
-    registerEndpoint("/stream/state", "Streaming state feedback (idle | streaming)", "string", "Streaming", true);
+    registerEndpoint("/recording/state", "Recording state feedback (idle | recording)", "string", "Recording", true, false);
+    registerEndpoint("/stream/state", "Streaming state feedback (idle | streaming)", "string", "Streaming", true, false);
     registerEndpoint("/hyperdeck/<number>/timeline-time", "Jump to timeline time on HyperDeck", "string", "HyperDeck", false);
-    registerEndpoint("/led/green", "Connection LED: 1.0 when connected", "float", "System", true);
-    registerEndpoint("/led/red", "Connection LED: 1.0 when disconnected", "float", "System", true);
+    registerEndpoint("/led/green", "Connection LED: 1.0 when connected", "float", "System", true, false);
+    registerEndpoint("/led/red", "Connection LED: 1.0 when disconnected", "float", "System", true, false);
 
     // Timed transitions: any length, the T-bar is moved by the application
     registerEndpoint("/me/<me>/transition/timed", "Transition of N seconds driven by the T-bar (0.1 to 600 s), ease-in-out unless a curve is given as second argument", "float", "Transitions", false);
@@ -353,8 +357,8 @@ void AddressRegistry::initStandardEndpoints() {
     registerEndpoint("/me/<me>/transition/timed/cancel", "Cancel the timed transition, the T-bar goes back to the start", "none", "Transitions", false);
     registerEndpoint("/me/<me>/transition/timed/pause", "Pause the timed transition", "none", "Transitions", false);
     registerEndpoint("/me/<me>/transition/timed/resume", "Resume the paused timed transition", "none", "Transitions", false);
-    registerEndpoint("/me/<me>/transition/timed/state", "Timed transition state feedback (idle, running, paused)", "string", "Transitions", true);
-    registerEndpoint("/me/<me>/transition/timed/progress", "Timed transition progress feedback (0.0 to 1.0)", "float", "Transitions", true);
+    registerEndpoint("/me/<me>/transition/timed/state", "Timed transition state feedback (idle, running, paused)", "string", "Transitions", true, false);
+    registerEndpoint("/me/<me>/transition/timed/progress", "Timed transition progress feedback (0.0 to 1.0)", "float", "Transitions", true, false);
 
     // Aux & Converted Video Mode
     registerEndpoint("/aux/<number>", "Set input source for Aux output <number>", "int", "Aux", true);

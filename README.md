@@ -38,7 +38,19 @@ Every address is listed in the [reference](docs/reference.md), and in the app's 
 ./build.sh
 ```
 
-Needs Qt 6, CMake and a C++17 compiler. The Blackmagic SDK headers are in `sdk/`. Push a tag such as `v5.0.6` to publish the macOS and Windows downloads through GitHub Actions.
+Needs Qt 6, CMake 3.21 or later and a C++17 compiler. The Blackmagic SDK headers are in `sdk/`. Push a tag such as `v5.0.6` to publish the macOS and Windows downloads through GitHub Actions.
+
+## Test OSC locally
+
+From a checkout with its submodules initialized, run the same tests as GitHub Actions.
+
+```sh
+cmake -S . -B build/osc-test
+cmake --build build/osc-test --config Release --target test_osc
+ctest --test-dir build/osc-test -C Release -V
+```
+
+The address test expands the registry for a simulated ATEM, sends one typed OSC datagram per address over loopback UDP, and reports the writable and read-only counts. It checks dispatcher acceptance for commands and confirms that writes to feedback addresses are rejected. The suite also checks representative backend calls, feedback and OSCQuery responses. You can run it on a machine connected to a live switcher because the test uses its own ephemeral UDP port and simulated backend.
 
 ## Thanks
 
