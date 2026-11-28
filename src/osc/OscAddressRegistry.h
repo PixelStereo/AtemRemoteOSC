@@ -15,6 +15,7 @@ struct EndpointDefinition {
     QString description;   // e.g. "Set Program Input for M/E <me>"
     QString valueType;     // e.g. "int" or "float" or "string" or "bool" or "none"
     QString category;      // e.g. "M/E & Transitions", "Audio", "Camera PTZ"
+    bool writable = true;
     bool feedback;         // true if switcher sends status updates on this address
     QString currentValue;  // live value for GUI display
     bool hasRange = false; // numeric range, exposed by OSCQuery so that controllers can draw a slider
@@ -44,8 +45,8 @@ public:
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
     void registerEndpoint(const QString &pattern, const QString &description,
-                          const QString &valueType, const QString &category, bool feedback);
-    int rowForAddress(const QString &address);
+                          const QString &valueType, const QString &category, bool feedback, bool writable = true);
+    int rowForAddress(const QString &address, bool cache = true);
     void updateLiveValue(const QString &pattern, const QString &value);
     void setRange(const QString &pattern, double min, double max);
     void setChoices(const QString &pattern, const QStringList &choices);

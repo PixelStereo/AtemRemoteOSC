@@ -3,7 +3,7 @@ name: CI
 # The tests used to run only inside the release workflow, on a tag. They now run on every push and pull request.
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 

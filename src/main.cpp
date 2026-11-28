@@ -2,11 +2,19 @@
 #include <QCommandLineParser>
 #include <QPixmap>
 #include <QTimer>
+#include <cstring>
+#include "osc/OscAddressCheck.h"
 #include "app/AtemRemoteOscApp.h"
 #include "gui/MainWindow.h"
 #include "gui/Theme.h"
 
 int main(int argc, char *argv[]) {
+    for (int i = 1; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--check-osc") == 0) {
+            QCoreApplication app(argc, argv);
+            return Osc::checkDeclaredAddresses();
+        }
+    }
     QApplication app(argc, argv);
 
     app.setApplicationName(QStringLiteral("AtemRemoteOsc"));
@@ -18,6 +26,7 @@ int main(int argc, char *argv[]) {
     QCommandLineParser cli;
     cli.addHelpOption();
     cli.addVersionOption();
+    cli.addOption(QCommandLineOption(QStringLiteral("check-osc"), QStringLiteral("Test every declared OSC address against a simulated ATEM and exit.")));
     QCommandLineOption shotOpt(QStringLiteral("screenshot"), QStringLiteral("Capture the main window, then quit (tests)."), QStringLiteral("capture.png"));
     cli.addOption(shotOpt);
     QCommandLineOption delayOpt(QStringLiteral("screenshot-delay"), QStringLiteral("Milliseconds to wait before the capture (with --screenshot)."), QStringLiteral("ms"), QStringLiteral("800"));

@@ -18,7 +18,7 @@ QString typeTag(const QString &valueType)
     if (valueType == QLatin1String("float")) return QStringLiteral("f");
     if (valueType == QLatin1String("bool")) return QStringLiteral("T");
     if (valueType == QLatin1String("string")) return QStringLiteral("s");
-    return QString();
+    return valueType == QLatin1String("none") ? QStringLiteral("I") : QString();
 }
 
 pxs::core::Value toValue(const Value &v)
@@ -167,11 +167,12 @@ bool QueryTree::rebuildIfNeeded()
                 const QString full = prefix + p;
                 pxs::core::tree::Node &node = m_tree.add(pxs::convert::toUtf8(full));
                 node.description = pxs::convert::toUtf8(description);
-                node.access = ep.feedback ? 3 : 2; // read/write, or write only
+                const bool readable = ep.feedback && ep.valueType != QLatin1String("none");
+                node.access = (readable ? 1 : 0) | (ep.writable ? 2 : 0);
                 node.type = pxs::convert::toUtf8(type);
                 if (!type.isEmpty()) {
                     node.range = range;
-                    if (ep.feedback) {
+                    if (readable) {
                         const Dispatcher *dispatcher = m_dispatcher;
                         node.get = [dispatcher, full] {
                             pxs::core::ValueList values;

@@ -54,12 +54,39 @@ static void addArg(Osc::Message &m, const QString &v) { m.addString(v); }
 class TestOsc : public QObject {
     Q_OBJECT
 private slots:
+    void testMacroFeedbackCanBeRequestedWithoutWriting() {
+        Osc::AddressRegistry registry;
+        Osc::Dispatcher dispatcher(&registry);
+        RecordingBackend backend;
+        dispatcher.addSwitcher("studio", &backend, nullptr);
+        Atem::MacroState macro;
+        macro.index = 3;
+        macro.name = "Opening";
+        macro.isValid = true;
+        emit backend.macroStateChanged(macro);
+        QString returnedAddress;
+        QVector<Osc::Value> returned;
+        connect(&dispatcher, &Osc::Dispatcher::feedbackSent, this,
+                [&](const QString &address, const QVector<Osc::Value> &values) {
+                    returnedAddress = address;
+                    returned = values;
+                });
+        dispatcher.dispatchMessage(Osc::Message("/atem/studio/macros/3/name"), QHostAddress::LocalHost, 0);
+        QCOMPARE(returnedAddress, QString("/atem/studio/macros/3/name"));
+        QCOMPARE(returned.value(0).toString(), QString("Opening"));
+        dispatcher.dispatchMessage(Osc::Message("/atem/studio/macros/max-number"), QHostAddress::LocalHost, 0);
+        QCOMPARE(returnedAddress, QString("/atem/studio/macros/max-number"));
+        QCOMPARE(returned.value(0).toInt(), int(backend.maxMacros()));
+    }
+
     void testOscEncodeDecode() {
         Osc::Message msg("/atem/me/1/program");
         msg.addInt(5);
         msg.addFloat(0.75f);
         msg.addString("camera1");
         msg.addBool(true);
+        msg.addValue(Osc::Value(int64_t{9007199254740993LL}));
+        msg.addValue(Osc::Value(1.0 / 3.0));
 
         QByteArray encoded = Osc::Packet::encodeMessage(msg);
         QVERIFY(!encoded.isEmpty());
@@ -72,11 +99,13 @@ private slots:
 
         const auto &outMsg = decoded[0];
         QCOMPARE(outMsg.address(), QString("/atem/me/1/program"));
-        QCOMPARE(outMsg.argumentCount(), 4);
+        QCOMPARE(outMsg.argumentCount(), 6);
         QCOMPARE(outMsg.arg(0).toInt(), 5);
         QVERIFY(qAbs(outMsg.arg(1).toFloat() - 0.75f) < 0.001f);
         QCOMPARE(outMsg.arg(2).toString(), QString("camera1"));
         QCOMPARE(outMsg.arg(3).toBool(), true);
+        QCOMPARE(outMsg.arg(4).wireInt64(), int64_t{9007199254740993LL});
+        QCOMPARE(outMsg.arg(5).wireDouble(), 1.0 / 3.0);
     }
 
     void testAddressRegistry() {
@@ -294,15 +323,14 @@ private slots:
 
         // Pause, resume
         send("/atem/transition/timed/linear", 5.0f);
-        QTest::qWait(120);
+        QTRY_VERIFY_WITH_TIMEOUT(!backend.positions.isEmpty(), 2000);
         send("/atem/transition/timed/pause");
         const int paused = backend.positions.size();
         QVERIFY(paused > 0);
         QTest::qWait(100);
         QCOMPARE(backend.positions.size(), paused);
         send("/atem/transition/timed/resume");
-        QTest::qWait(80);
-        QVERIFY(backend.positions.size() > paused);
+        QTRY_VERIFY_WITH_TIMEOUT(backend.positions.size() > paused, 2000);
 
         // A cut takes over: the bar goes back to the start and nothing more is sent
         send("/atem/transition/cut");

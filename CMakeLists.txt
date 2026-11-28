@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.21)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION")
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" atem_version LIMIT_COUNT 1)
 if(DEFINED ATEMREMOTEOSC_TAG_VERSION)
@@ -39,6 +39,8 @@ add_subdirectory(third_party/pxs-qt EXCLUDE_FROM_ALL)
 
 set(SOURCES
     src/main.cpp
+    src/osc/OscAddressCheck.cpp
+    src/osc/OscAddressCheck.h
     src/app/AtemRemoteOscApp.h
     src/app/AtemRemoteOscApp.cpp
     src/osc/OscTypes.h
@@ -145,6 +147,7 @@ target_link_libraries(AtemRemoteOsc PRIVATE
     Qt6::Network
     pxs::theme
     pxs::tree
+    pxs::osc
     pxs::oscquery
 )
 
@@ -190,7 +193,10 @@ target_link_libraries(test_osc PRIVATE
     Qt6::Network
     Qt6::Test
     pxs::tree
+    pxs::osc
     pxs::oscquery
 )
 add_test(NAME test_osc COMMAND test_osc)
+add_test(NAME osc_addresses COMMAND AtemRemoteOsc --check-osc)
+set_tests_properties(osc_addresses PROPERTIES TIMEOUT 30)
 
