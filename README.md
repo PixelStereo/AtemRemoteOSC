@@ -7,9 +7,9 @@
 From TouchOSC, Max, QLab, Companion or any OSC software. Every address answers back with its value, and OSCQuery clients find it by themselves.
 
 <!-- release-downloads:start -->
-**LATEST VERSION · [v5.0.10](https://github.com/PixelStereo/AtemRemoteOSC/releases/tag/v5.0.10)**
+**LATEST VERSION · [v5.0.11](https://github.com/PixelStereo/AtemRemoteOSC/releases/tag/v5.0.11)**
 
-[![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple_Silicon-6b7787?style=for-the-badge&logo=apple&logoColor=white&labelColor=1a1c20)](https://github.com/PixelStereo/AtemRemoteOSC/releases/download/v5.0.10/AtemRemoteOSC-macos-arm64-v5.0.10.zip)&nbsp;&nbsp;[![macOS Intel](https://img.shields.io/badge/macOS-Intel-515b69?style=for-the-badge&logo=apple&logoColor=white&labelColor=1a1c20)](https://github.com/PixelStereo/AtemRemoteOSC/releases/download/v5.0.10/AtemRemoteOSC-macos-x64-v5.0.10.zip)&nbsp;&nbsp;[![Windows Installer](https://img.shields.io/badge/Windows-Installer-2b6fb6?style=for-the-badge&logo=windows&logoColor=white&labelColor=1a1c20)](https://github.com/PixelStereo/AtemRemoteOSC/releases/download/v5.0.10/AtemRemoteOSC-windows-x64-v5.0.10-Setup.exe)
+[![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple_Silicon-6b7787?style=for-the-badge&logo=apple&logoColor=white&labelColor=1a1c20)](https://github.com/PixelStereo/AtemRemoteOSC/releases/download/v5.0.11/AtemRemoteOSC-macos-arm64-v5.0.11.zip)&nbsp;&nbsp;[![macOS Intel](https://img.shields.io/badge/macOS-Intel-515b69?style=for-the-badge&logo=apple&logoColor=white&labelColor=1a1c20)](https://github.com/PixelStereo/AtemRemoteOSC/releases/download/v5.0.11/AtemRemoteOSC-macos-x64-v5.0.11.zip)&nbsp;&nbsp;[![Windows Installer](https://img.shields.io/badge/Windows-Installer-2b6fb6?style=for-the-badge&logo=windows&logoColor=white&labelColor=1a1c20)](https://github.com/PixelStereo/AtemRemoteOSC/releases/download/v5.0.11/AtemRemoteOSC-windows-x64-v5.0.11-Setup.exe)
 <!-- release-downloads:end -->
 
 </div>
