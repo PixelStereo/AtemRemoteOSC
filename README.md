@@ -42,11 +42,13 @@ Needs Qt 6, CMake 3.21 or later and a C++17 compiler. The Blackmagic SDK headers
 
 ## Test OSC locally
 
-From a checkout with its submodules initialized, run the same tests as GitHub Actions.
+Run the application executable with `--check-osc` to check OSC without opening its window. On macOS, the executable is inside the `.app` bundle under `Contents/MacOS`. The command prints a summary and exits with a nonzero status if any check fails.
+
+To run the full suite from a checkout with its submodules initialized, use the same commands as GitHub Actions.
 
 ```sh
 cmake -S . -B build/osc-test
-cmake --build build/osc-test --config Release --target test_osc
+cmake --build build/osc-test --config Release
 ctest --test-dir build/osc-test -C Release -V
 ```
 

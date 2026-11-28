@@ -39,6 +39,8 @@ add_subdirectory(third_party/pxs-qt EXCLUDE_FROM_ALL)
 
 set(SOURCES
     src/main.cpp
+    src/osc/OscAddressCheck.cpp
+    src/osc/OscAddressCheck.h
     src/app/AtemRemoteOscApp.h
     src/app/AtemRemoteOscApp.cpp
     src/osc/OscTypes.h
@@ -195,4 +197,6 @@ target_link_libraries(test_osc PRIVATE
     pxs::oscquery
 )
 add_test(NAME test_osc COMMAND test_osc)
+add_test(NAME osc_addresses COMMAND AtemRemoteOsc --check-osc)
+set_tests_properties(osc_addresses PROPERTIES TIMEOUT 30)
 
