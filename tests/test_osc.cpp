@@ -323,15 +323,14 @@ private slots:
 
         // Pause, resume
         send("/atem/transition/timed/linear", 5.0f);
-        QTest::qWait(120);
+        QTRY_VERIFY_WITH_TIMEOUT(!backend.positions.isEmpty(), 2000);
         send("/atem/transition/timed/pause");
         const int paused = backend.positions.size();
         QVERIFY(paused > 0);
         QTest::qWait(100);
         QCOMPARE(backend.positions.size(), paused);
         send("/atem/transition/timed/resume");
-        QTest::qWait(80);
-        QVERIFY(backend.positions.size() > paused);
+        QTRY_VERIFY_WITH_TIMEOUT(backend.positions.size() > paused, 2000);
 
         // A cut takes over: the bar goes back to the start and nothing more is sent
         send("/atem/transition/cut");
